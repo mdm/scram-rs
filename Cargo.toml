@@ -1,0 +1,28 @@
+[package]
+name = "scram-rs"
+version = "0.1.0"
+authors = ["Aleksandr Morozov"]
+edition = "2018"
+description="SCRAM auth lib"
+license="GPLv3"
+
+[profile.dev]
+opt-level = 0
+
+[profile.release]
+opt-level = 3
+overflow-checks = true
+lto = true
+
+[dependencies]
+
+#non GPL
+getrandom="0.2"
+base64 = "0.13"
+md-5 = "0.9"
+sha-1 = "0.9"
+sha2 = "0.9"
+hmac = "0.10"
+pbkdf2 = "0.7"
+native-tls = "0.2"
+
