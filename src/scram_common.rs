@@ -28,7 +28,7 @@ impl ScramCommon
     pub const MOCK_AUTH_NONCE_LEN: usize = 16;
     pub const SCRAM_DEFAULT_SALT_ITER: u32 = 4096;
 
-    pub fn pg_random(len: usize) -> ScramResult<Vec<u8>>
+    pub fn sc_random(len: usize) -> ScramResult<Vec<u8>>
     {
         let mut data = Vec::<u8>::with_capacity(len);
         getrandom(&mut data).map_err(|e| scram_error_map!(ScramErrorCode::ExternalError, 

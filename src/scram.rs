@@ -156,10 +156,16 @@ impl ScramParse
     }
 }
 
+/// The Scram Nonce initialization.
 pub enum ScramNonce<'sn>
 {
+    /// No nonce is proved
     None,
+
+    /// A plain text 
     Plain(&'sn [u8]),
+
+    /// A base64 formtatted
     Base64(&'sn str),
 }
 
@@ -180,11 +186,12 @@ impl<'sn> ScramNonce<'sn>
         return Self::Base64(b);
     }
 
+    /// Extract Nonce
     pub fn get_nonce(self) -> ScramResult<String>
     {
         match self
         {
-            ScramNonce::None => return Ok(base64::encode(ScramCommon::pg_random(ScramCommon::SCRAM_RAW_NONCE_LEN)?)),
+            ScramNonce::None => return Ok(base64::encode(ScramCommon::sc_random(ScramCommon::SCRAM_RAW_NONCE_LEN)?)),
             ScramNonce::Plain(p) => 
             {
                 if p.len() > ScramCommon::SCRAM_RAW_NONCE_LEN
@@ -201,12 +208,13 @@ impl<'sn> ScramNonce<'sn>
     }
 }
 
-pub struct ScramServer<S: ScramHashing, A: ScramAuthServer>
+
+pub struct ScramServer<'ss, S: ScramHashing, A: ScramAuthServer>
 {
     /// The hasher which will be used: SHA-1 SHA-256
     hasher: PhantomData<S>,
     /// The Auth backend which handles user search
-    auth: A,
+    auth: &'ss A,
     /// If the auth requires support of channel binding -PLUS
     chan_bind: bool,
     /// username n=
@@ -221,9 +229,10 @@ pub struct ScramServer<S: ScramHashing, A: ScramAuthServer>
     chanbind: ChannelBinding,
 }
 
-impl<S: ScramHashing, A: ScramAuthServer> ScramServer<S, A>
+impl<'ss, S: ScramHashing, A: ScramAuthServer> ScramServer<'ss, S, A>
 {
-    pub fn new(scramauthserv: A, scram_nonce: ScramNonce, chan_bind: bool) -> ScramResult<Self>
+    /// Creates new instance
+    pub fn new(scramauthserv: &'ss A, scram_nonce: ScramNonce, chan_bind: bool) -> ScramResult<ScramServer<'ss, S, A>>
     {
 
         let res = Self
@@ -241,6 +250,7 @@ impl<S: ScramHashing, A: ScramAuthServer> ScramServer<S, A>
         return Ok(res);
     }
 
+    /// Parses received resposne
     pub fn parse_response(&mut self, resp: String) -> ScramResult<ScramParse>
     {
         let parsed_resp = ScramDataParser::from_raw(&resp, &self.state)?;
@@ -358,20 +368,21 @@ impl<S: ScramHashing, A: ScramAuthServer> ScramServer<S, A>
 }
 
 
-pub struct ScramClient<S: ScramHashing, A: ScramAuthClient>
+pub struct ScramClient<'sc, S: ScramHashing, A: ScramAuthClient>
 {
     hasher: PhantomData<S>,
-    auth: A,
+    auth: &'sc A,
     client_nonce: String,
     state: ScramState,
     chanbind: ChannelBinding,
 }
 
-
-
-impl<S: ScramHashing, A: ScramAuthClient> ScramClient<S, A>
+impl<'sc, S: ScramHashing, A: ScramAuthClient> ScramClient<'sc, S, A>
 {
-    pub fn new(scramauthcli: A, scram_nonce: ScramNonce, chanbindtype: ChannelBinding) -> ScramResult<Self>
+    /// Creates new client instance and sets every field to default state
+    pub fn new(scramauthcli: &'sc A, 
+                scram_nonce: ScramNonce, 
+                chanbindtype: ChannelBinding) -> ScramResult<ScramClient<'sc, S, A>>
     {
         return Ok(
                     Self
@@ -385,6 +396,7 @@ impl<S: ScramHashing, A: ScramAuthClient> ScramClient<S, A>
                 );
     }
 
+    /// If the SCRAM handshake cycle was completed
     pub fn is_completed(&self) -> bool
     {
         match self.state
@@ -395,7 +407,7 @@ impl<S: ScramHashing, A: ScramAuthClient> ScramClient<S, A>
     }
 
     /// Initializes the SCRAM negoatiation from client
-    /// returns the 
+    /// returns the non encoded to base64 string
     pub fn init_client(&mut self) -> String
     {            
         let compiled = [self.chanbind.convert2header(),
@@ -406,7 +418,7 @@ impl<S: ScramHashing, A: ScramAuthClient> ScramClient<S, A>
         compiled
     }
 
-
+    /// Parses the response from Server. The instance automatically tracks the state
     pub fn parse_response(&mut self, resp: String) -> ScramResult<ScramParse>
     {
         let parsed_resp = ScramDataParser::from_raw(&resp, &self.state)?;
@@ -491,12 +503,7 @@ impl<S: ScramHashing, A: ScramAuthClient> ScramClient<S, A>
     }
 }
 
-
-// https://doxygen.postgresql.org/auth-scram_8c_source.html
-//https://github.com/tomprogrammer/scram/blob/ecb790c7d093c3704451a5238173c6bba794f1a5/src/server.rs
-//https://gitlab.com/lumi/sasl-rs/-/blob/master/src/client/mechanisms/scram.rs
-
-
+/// Parsed data storage
 enum ScramData<'par>
 {
     /// first message from client in the context of a SCRAM
@@ -1016,7 +1023,7 @@ fn scram_sha256_server()
     let serv = AuthServer::new();
     let nonce = ScramNonce::Base64(server_nonce);
 
-    let scram_res = ScramServer::<ScramSha256, AuthServer>::new(serv, nonce, false);
+    let scram_res = ScramServer::<ScramSha256, AuthServer>::new(&serv, nonce, false);
     assert_eq!(scram_res.is_ok(), true);
 
     let mut scram = scram_res.unwrap();
@@ -1096,7 +1103,7 @@ fn scram_sha256_works()
     let ac = AuthClient::new(username, password);
     let nonce = ScramNonce::Plain(&client_nonce_dec);
 
-    let scram_res = ScramClient::<ScramSha256, AuthClient>::new(ac, nonce, cbt);
+    let scram_res = ScramClient::<ScramSha256, AuthClient>::new(&ac, nonce, cbt);
     assert_eq!(scram_res.is_ok(), true);
 
     let mut scram = scram_res.unwrap();

@@ -62,7 +62,7 @@ impl ScramPassword
     fn scram_mock_salt() -> ScramResult<Vec<u8>>
     {
         //generate mock auth nonce (todo: to statically created)
-        let mock_auth_nonce = ScramCommon::pg_random(ScramCommon::MOCK_AUTH_NONCE_LEN)?;
+        let mock_auth_nonce = ScramCommon::sc_random(ScramCommon::MOCK_AUTH_NONCE_LEN)?;
 
         return Ok(mock_auth_nonce);
     }
@@ -72,7 +72,7 @@ impl ScramPassword
         // generate fake data
         let salt = ScramPassword::scram_mock_salt()?;
 
-        let password_raw = ScramCommon::pg_random(ScramCommon::MOCK_AUTH_NONCE_LEN)?;
+        let password_raw = ScramCommon::sc_random(ScramCommon::MOCK_AUTH_NONCE_LEN)?;
 
         let salted_password = S::derive(&password_raw, &salt, ScramCommon::SCRAM_DEFAULT_SALT_ITER)?;
 
