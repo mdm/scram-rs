@@ -162,38 +162,27 @@ pub trait ScramAuthClient
     fn get_password(&self) -> &String;
 }
 
-/*pub enum ScramAuth
+#[test]
+fn test_speed()
 {
-    Client(dyn ScramAuthClient),
-    Server(dyn ScramAuthServer),
+    use std::time::Instant;
+    use super::scram_hashing::ScramSha256;
+
+    let start = Instant::now();
+
+    let res = ScramPassword::not_found::<ScramSha256>();
+    assert_eq!(res.is_ok(), true);
+
+    let el = start.elapsed();
+    println!("not found took: {:?}", el);
+
+    let start = Instant::now();
+
+    let res = ScramPassword::found_plaintext_password::<ScramSha256>(b"123");
+    assert_eq!(res.is_ok(), true);
+    
+    let el = start.elapsed();
+    println!("found_plaintext_password: {:?}", el);
+
 }
 
-impl ScramAuth
-{
-    pub fn get_username(&self) -> &String
-    {
-        match *self
-        {
-            Self::Client(ref s) => s.get_username(),
-            Self::Server(_) => panic!("scram: ScramAuth get_username misuse"),
-        }
-    }
-
-    pub fn get_password(&self) -> &String
-    {
-        match *self
-        {
-            Self::Client(ref s) => s.get_password(),
-            Self::Server(_) => panic!("scram: ScramAuth get_password misuse"),
-        }
-    }
-
-    pub fn get_password_for_user(&self, username: &String) -> ScramPassword
-    {
-        match *self
-        {
-            Self::Client(_) => panic!("scram: ScramAuth get_password_for_user misuse"),
-            Self::Server(ref s) => s.get_password_for_user(username),
-        }
-    }
-}*/

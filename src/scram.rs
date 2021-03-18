@@ -17,6 +17,7 @@
 */
 
 use std::fmt;
+use std::str;
 use std::str::Chars;
 use std::iter::Peekable;
 use std::marker::PhantomData;
@@ -250,10 +251,27 @@ impl<'ss, S: ScramHashing, A: ScramAuthServer> ScramServer<'ss, S, A>
         return Ok(res);
     }
 
-    /// Parses received resposne
-    pub fn parse_response(&mut self, resp: String) -> ScramResult<ScramParse>
+    /// Parses response and decodes the response from base64
+    /// It is assumed that resp is checked for valid UTF-8
+    pub fn parse_response_base64(&mut self, resp: String) -> ScramResult<ScramParse>
     {
-        let parsed_resp = ScramDataParser::from_raw(&resp, &self.state)?;
+        let decoded = base64::decode(resp)
+                            .map_err(|e| scram_error_map!(ScramErrorCode::MalformedScramMsg, 
+                                                        "base64 decode client response failed, '{}'", e))?;
+
+        let dec_utf8 = 
+            str::from_utf8(&decoded)
+                .map_err(|e| scram_error_map!(ScramErrorCode::MalformedScramMsg, 
+                                            "base64 decoded response contains invalid UTF-8 seq, '{}'", e))?;
+
+        return self.parse_response(dec_utf8);
+    }
+
+    /// Parses received resposne
+    /// It is assumed that resp is UTF-8 valid sequences
+    pub fn parse_response(&mut self, resp: &str) -> ScramResult<ScramParse>
+    {
+        let parsed_resp = ScramDataParser::from_raw(resp, &self.state)?;
 
         match parsed_resp
         {
@@ -418,8 +436,24 @@ impl<'sc, S: ScramHashing, A: ScramAuthClient> ScramClient<'sc, S, A>
         compiled
     }
 
+    /// Parses response and decodes the response from base64
+    /// It is assumed that resp is checked for valid UTF-8
+    pub fn parse_response_base64(&mut self, resp: String) -> ScramResult<ScramParse>
+    {
+        let decoded = base64::decode(resp)
+                            .map_err(|e| scram_error_map!(ScramErrorCode::MalformedScramMsg, 
+                                                        "base64 decode server response failed, '{}'", e))?;
+
+        let dec_utf8 = 
+            str::from_utf8(&decoded)
+                .map_err(|e| scram_error_map!(ScramErrorCode::MalformedScramMsg, 
+                                            "base64 decoded response contains invalid UTF-8 seq, '{}'", e))?;
+
+        return self.parse_response(dec_utf8);
+    }
+
     /// Parses the response from Server. The instance automatically tracks the state
-    pub fn parse_response(&mut self, resp: String) -> ScramResult<ScramParse>
+    pub fn parse_response(&mut self, resp: &str) -> ScramResult<ScramParse>
     {
         let parsed_resp = ScramDataParser::from_raw(&resp, &self.state)?;
 
@@ -439,14 +473,11 @@ impl<'sc, S: ScramHashing, A: ScramAuthClient> ScramClient<'sc, S, A>
                 }
 
                 //todo channel bind things SASL 
-                let cb_data = encode_config(
+                let cb_data = base64::encode(
                                 [
                                     self.chanbind.convert2header(), 
                                     self.chanbind.convert2data()
-                                ].concat(),
-
-                //base64 config
-                base64::Config::new(base64::CharacterSet::Standard, true));
+                                ].concat());
 
                 let client_final_message_bare = ["c=", &cb_data, ",r=", nonce].concat();
 
@@ -1029,14 +1060,14 @@ fn scram_sha256_server()
     let mut scram = scram_res.unwrap();
 
     let start = Instant::now();
-    let resp_res = scram.parse_response(client_init.to_string());
+    let resp_res = scram.parse_response(client_init);
 
     assert_eq!(resp_res.is_ok(), true);
 
     let resp = resp_res.unwrap().extract_output().unwrap();
     assert_eq!( resp.as_str(), server_init ); 
 
-    let resp_res = scram.parse_response(client_final.to_string());
+    let resp_res = scram.parse_response(client_final);
     if resp_res.is_err() == true
     {
         println!("{}", resp_res.err().unwrap());
@@ -1111,13 +1142,13 @@ fn scram_sha256_works()
     let init = scram.init_client();
     assert_eq!( init.as_str(), client_init ); 
 
-    let resp_res = scram.parse_response(server_init.to_string());
+    let resp_res = scram.parse_response(server_init);
     assert_eq!(resp_res.is_ok(), true);
 
     let resp = resp_res.unwrap().extract_output().unwrap();
     assert_eq!( resp.as_str(), client_final ); 
 
-    let res = scram.parse_response(server_final.to_string());
+    let res = scram.parse_response(server_final);
     assert_eq!(res.is_ok(), true);
 
     let el = start.elapsed();
