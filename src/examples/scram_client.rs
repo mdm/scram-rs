@@ -1,6 +1,6 @@
 
 
-use scram_rs::scram_hashing::ScramSha256;
+/*use scram_rs::scram_hashing::ScramSha256;
 use scram_rs::scram_auth::ScramAuthClient;
 use scram_rs::scram_cb::ChannelBinding;
 
@@ -41,4 +41,4 @@ pub fn scram_scha256()
    /* let nonce = ScramNonce::Plain(&client_nonce_dec);
 
     let scram_res = ScramClient::<ScramSha256, AuthClient>::new(ac, nonce, cbt);*/
-}
+}*/
