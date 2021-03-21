@@ -67,6 +67,7 @@ impl ScramCommon
         return Ok(data);
     }
 
+    /// Output all supported types with separator
     pub fn adrvertise<S: AsRef<str>>(sep: S) -> String
     {
         let mut scram_adv: Vec<&str> = Vec::with_capacity(SCRAM_TYPES.len());

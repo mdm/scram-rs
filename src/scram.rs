@@ -17,21 +17,18 @@
 * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
-use std::io;
 use std::fmt;
 use std::str;
 use std::str::Chars;
 use std::iter::Peekable;
 use std::marker::PhantomData;
 
-use base64::{encode_config};
-
 use super::scram_error::{ScramResult, ScramRuntimeError, ScramErrorCode};
 use super::{scram_error, scram_error_map};
-use super::scram_cb::{ChannelBindingData, ChannelBindingType};
+use super::scram_cb::{ServerChannelBindType, ClientChannelBindingType};
 use super::scram_auth::{ScramPassword, ScramAuthServer, ScramAuthClient};
 use super::scram_hashing::ScramHashing;
-use super::scram_common::{SCRAM_TYPES, ScramType, ScramCommon};
+use super::scram_common::{ScramType, ScramCommon};
 
 
 /// Order:
@@ -211,8 +208,18 @@ impl<'sn> ScramNonce<'sn>
     }
 }
 
-
-pub struct ScramServer<'ss, S: ScramHashing, A: ScramAuthServer/*, B: io::Read + io::Write*/>
+/// A Scram Server. Handles the icoming data
+/// S: ScramHashing is picked by the program which will use this crate.
+///     This library does not handle manually SCRAM types, so the developer
+///     should manually parse the requested type i.e SCRAM-SHA-256 and
+///     prepeare the instance correctly.
+/// A: ScramAuthServer is a callback trait for authentification. Developer
+///     must attach the ScramAuthServer trait to his authentification
+///     implementation.
+/// If client picks SCRAM-SHA-<any>-PLUS then the developer should 
+///     also provide the data_chanbind argument with the server
+///     certificate endpoint i.e native_tls::TlsStream::tls_server_end_point()
+pub struct ScramServer<'ss, S: ScramHashing, A: ScramAuthServer>
 {
     /// The hasher which will be used: SHA-1 SHA-256
     hasher: PhantomData<S>,
@@ -226,15 +233,15 @@ pub struct ScramServer<'ss, S: ScramHashing, A: ScramAuthServer/*, B: io::Read +
     sp: ScramPassword,
     /// Generated server nonce
     server_nonce: String,
-    /// Current auth state
+    /// Current scrum state
     state: ScramState,
     /// Received channel binding opt from client
-    cli_chanbind: ChannelBindingType,
-    /// TLS channel info
-    data_chanbind: ChannelBindingData,//ChannelBinding<'ss, B>,
+    cli_chanbind: ServerChannelBindType,
+    /// TLS server-endpoint certificate hash
+    data_chanbind: Option<Vec<u8>>
 }
 
-impl<'ss, S: ScramHashing, A: ScramAuthServer/*, B: io::Read + io::Write*/> ScramServer<'ss, S, A/*, B*/>
+impl<'ss, S: ScramHashing, A: ScramAuthServer> ScramServer<'ss, S, A/*, B*/>
 {
     // returns the supported types in format SCRAM SCRAM SCRAM ...
     pub fn advertise_types() -> String
@@ -244,10 +251,16 @@ impl<'ss, S: ScramHashing, A: ScramAuthServer/*, B: io::Read + io::Write*/> Scra
 
     /// Creates new instance
     pub fn new(scramauthserv: &'ss A,
-                data_chanbind: ChannelBindingData, 
+                data_chanbind: Option<Vec<u8>>, 
                 scram_nonce: ScramNonce, 
                 st: &'ss ScramType) -> ScramResult<ScramServer<'ss, S, A>>
     {
+        if st.scram_chan_bind == true && data_chanbind.is_none() == true
+        {
+            scram_error!(ScramErrorCode::ExternalError,
+                        "scram: '{}' requires the data_chanbind to be set",
+                        st);
+        }
 
         let res = Self
             {
@@ -258,7 +271,7 @@ impl<'ss, S: ScramHashing, A: ScramAuthServer/*, B: io::Read + io::Write*/> Scra
                 sp: ScramPassword::default(),
                 server_nonce: scram_nonce.get_nonce()?,
                 state: ScramState::WaitForClientInitalMsg,
-                cli_chanbind: ChannelBindingType::n(),
+                cli_chanbind: ServerChannelBindType::n(),
                 data_chanbind: data_chanbind,
             };
 
@@ -289,12 +302,10 @@ impl<'ss, S: ScramHashing, A: ScramAuthServer/*, B: io::Read + io::Write*/> Scra
 
         match parsed_resp
         {
+            // Initial message from client
             ScramData::CmsgInitial{chan_bind, user, nonce} =>
             {
-                //if client supports channel binding and assumes the server does not then
-                // the must fail authentification if it supports channel binding ToDO
-
-                //channel bind is not yet supported
+                //channel bind test
                 chan_bind.server_initial_verify_client_cb(self.st)?;
 
                 //authID is not supported
@@ -322,15 +333,16 @@ impl<'ss, S: ScramHashing, A: ScramAuthServer/*, B: io::Read + io::Write*/> Scra
             {
                 panic!("server can not handle state: {}", parsed_resp);
             },
+            //final message from client (STEP 2)
             ScramData::CmsgFinalMessage{chanbinding, finalnonce, proof, client_nonce} =>
             {
                 // verify channel bind
                 self.cli_chanbind.server_final_verify_client_cb(
                         self.st, 
                         chanbinding,
-                        &self.data_chanbind)?;
+                        self.data_chanbind.as_ref())?;
 
-                let nonce = ["",client_nonce, &self.server_nonce].concat();
+                let nonce = [client_nonce.as_str(), self.server_nonce.as_str()].concat();
 
                 // verify nonce
                 if finalnonce != nonce.as_str()
@@ -339,15 +351,15 @@ impl<'ss, S: ScramHashing, A: ScramAuthServer/*, B: io::Read + io::Write*/> Scra
                                 "received invalid nonce rcvn: {} have: {}", finalnonce, client_nonce);
                 }
 
-                let cb_data = base64::encode(
+                /*let cb_data = base64::encode(
                     [
                         self.cli_chanbind.convert2header(), 
                         self.cli_chanbind.convert2data()
-                    ].concat());
+                    ].concat());*/
     
                 //base64 config
                 
-                let client_final_without_proof = ["c=", &cb_data, ",r=", &nonce].concat();
+                let client_final_without_proof = ["c=", chanbinding, ",r=", &nonce].concat();
                 let client_first_bare = ["n=", self.username.as_ref().unwrap(), ",r=", client_nonce].concat();
                 let server_first = 
                             [
@@ -403,14 +415,28 @@ impl<'ss, S: ScramHashing, A: ScramAuthServer/*, B: io::Read + io::Write*/> Scra
     }
 }
 
-
+/// A Scram Client
+/// S: ScramHashing a developer should manually preprogram the ScramHashing
+///     for every supported by their's program types of auth.
+/// A: ScramAuthClient a developes should attach a ScramAuthClient trait to
+///     his implementation where the username and password are stored or
+///     implement one.
+/// 
+/// If a developer which to use a channel bind then developer should find
+///     out how to extract endpoint certificate from his TLS connection.
+///     i.e native_tls::TlsStream::tls_server_end_point()
 pub struct ScramClient<'sc, S: ScramHashing, A: ScramAuthClient>
 {
+    /// A hasher picked
     hasher: PhantomData<S>,
+    /// A authentification callback
     auth: &'sc A,
+    /// A client generated/picked nonce
     client_nonce: String,
+    /// A current state step
     state: ScramState,
-    chanbind: ChannelBindingType,
+    /// A type of the channel bind
+    chanbind: ClientChannelBindingType,
 }
 
 impl<'sc, S: ScramHashing, A: ScramAuthClient> ScramClient<'sc, S, A>
@@ -418,7 +444,7 @@ impl<'sc, S: ScramHashing, A: ScramAuthClient> ScramClient<'sc, S, A>
     /// Creates new client instance and sets every field to default state
     pub fn new(scramauthcli: &'sc A, 
                 scram_nonce: ScramNonce, 
-                chanbindtype: ChannelBindingType) -> ScramResult<ScramClient<'sc, S, A>>
+                chanbindtype: ClientChannelBindingType) -> ScramResult<ScramClient<'sc, S, A>>
     {
         return Ok(
                     Self
@@ -443,15 +469,23 @@ impl<'sc, S: ScramHashing, A: ScramAuthClient> ScramClient<'sc, S, A>
     }
 
     /// Initializes the SCRAM negoatiation from client
-    /// returns the non encoded to base64 string
-    pub fn init_client(&mut self) -> String
+    /// returns base64 encoded string or non decoded string
+    pub fn init_client(&mut self, to_base64: bool) -> String
     {            
         let compiled = [self.chanbind.convert2header(),
-                        "n=", self.auth.get_username(),
-                        ",r=", &self.client_nonce].concat();
+                        b"n=", self.auth.get_username().as_bytes(),
+                        b",r=", &self.client_nonce.as_bytes()].concat();
         
-        self.state = ScramState::WaitForServInitMsg;        
-        compiled
+        self.state = ScramState::WaitForServInitMsg;     
+        
+        if to_base64 == true
+        {
+            return base64::encode(compiled);
+        }
+        else
+        {
+            return unsafe {String::from_utf8_unchecked(compiled)};
+        }
     }
 
     /// Parses response and decodes the response from base64
@@ -467,11 +501,11 @@ impl<'sc, S: ScramHashing, A: ScramAuthClient> ScramClient<'sc, S, A>
                 .map_err(|e| scram_error_map!(ScramErrorCode::MalformedScramMsg, 
                                             "base64 decoded response contains invalid UTF-8 seq, '{}'", e))?;
 
-        return self.parse_response(dec_utf8);
+        return self.parse_response(dec_utf8, true);
     }
 
     /// Parses the response from Server. The instance automatically tracks the state
-    pub fn parse_response(&mut self, resp: &str) -> ScramResult<ScramParse>
+    pub fn parse_response(&mut self, resp: &str, to_base64: bool) -> ScramResult<ScramParse>
     {
         let parsed_resp = ScramDataParser::from_raw(&resp, &self.state)?;
 
@@ -481,6 +515,7 @@ impl<'sc, S: ScramHashing, A: ScramAuthClient> ScramClient<'sc, S, A>
             {
                 panic!("scram: client can not handle state: {}", parsed_resp);
             },
+            // Client sends response to server after intial message
             ScramData::SmsgInitial{nonce, salt, itrcnt} => 
             {
                 //validate iterations
@@ -499,11 +534,12 @@ impl<'sc, S: ScramHashing, A: ScramAuthClient> ScramClient<'sc, S, A>
 
                 let client_final_message_bare = ["c=", &cb_data, ",r=", nonce].concat();
 
-                let authmsg = [
-                                "n=", self.auth.get_username(),
-                                ",r=", &self.client_nonce, 
-                                ",", &resp,
-                                ",", &client_final_message_bare
+                let authmsg = 
+                            [
+                                b"n=", self.auth.get_username().as_bytes(),
+                                b",r=", self.client_nonce.as_bytes(), 
+                                b",", resp.as_bytes(),
+                                b",", client_final_message_bare.as_bytes()
                             ].concat();
 
                 let salted_password = S::derive(self.auth.get_password().as_bytes(), &salt, itrcnt)?;
@@ -513,8 +549,8 @@ impl<'sc, S: ScramHashing, A: ScramAuthClient> ScramClient<'sc, S, A>
                 
 
                 let stored_key = S::hash(&client_key);
-                let client_signature = S::hmac(authmsg.as_bytes(), &stored_key)?;
-                let server_signature = S::hmac(authmsg.as_bytes(), &server_key)?;
+                let client_signature = S::hmac(&authmsg, &stored_key)?;
+                let server_signature = S::hmac(&authmsg, &server_key)?;
                 
                 let client_response = [
                                         &client_final_message_bare,
@@ -525,7 +561,15 @@ impl<'sc, S: ScramHashing, A: ScramAuthClient> ScramClient<'sc, S, A>
 
                 self.state = ScramState::WaitForServFinalMsg{server_signature: server_signature};
                 
-                return Ok(ScramParse::Output(client_response));
+                if to_base64 == true
+                {
+                    return Ok(ScramParse::Output(base64::encode(client_response)));
+                }
+                else
+                {
+                    return Ok(ScramParse::Output(client_response));
+                }
+                
             },
             ScramData::CmsgFinalMessage{..} =>
             {
@@ -559,7 +603,7 @@ enum ScramData<'par>
     CmsgInitial
     {
         /// n, or y, or p=<val>
-        chan_bind: ChannelBindingType,
+        chan_bind: ServerChannelBindType,
         //authid and other is not supported
         /// "n=" saslname
         user: &'par str,
@@ -879,7 +923,7 @@ impl<'par> ScramDataParser<'par>
 
                     // current n,
 
-                    ChannelBindingType::n()
+                    ServerChannelBindType::n()
                 },
                 'y' =>
                 {
@@ -895,7 +939,7 @@ impl<'par> ScramDataParser<'par>
                                     self.pos);
                     }
 
-                    ChannelBindingType::y()
+                    ServerChannelBindType::y()
                 },
                 'p' =>
                 {
@@ -905,7 +949,7 @@ impl<'par> ScramDataParser<'par>
                     let par = self.read_parameter('p')?;
                     //p=..., curchar: ,
 
-                    ChannelBindingType::from_str(par)?
+                    ServerChannelBindType::from_str(par)?
                 },
                 _ => scram_error!(ScramErrorCode::MalformedScramMsg,
                                 "expected 'n,|y,|p=' \
@@ -1071,9 +1115,9 @@ fn scram_sha256_server()
 
     let serv = AuthServer::new();
     let nonce = ScramNonce::Base64(server_nonce);
-    let sbd = ChannelBindingData::none();
+   
     let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
-    let scram_res = ScramServer::<ScramSha256, AuthServer>::new(&serv, sbd, nonce, scramtype);
+    let scram_res = ScramServer::<ScramSha256, AuthServer>::new(&serv, None, nonce, scramtype);
     assert_eq!(scram_res.is_ok(), true);
 
     let mut scram = scram_res.unwrap();
@@ -1148,7 +1192,7 @@ fn scram_sha256_works()
     
     let start = Instant::now();
 
-    let cbt = ChannelBindingType::from_str("none").unwrap();
+    let cbt = ClientChannelBindingType::without_chan_binding();
 
     let ac = AuthClient::new(username, password);
     let nonce = ScramNonce::Plain(&client_nonce_dec);
@@ -1158,16 +1202,16 @@ fn scram_sha256_works()
 
     let mut scram = scram_res.unwrap();
     
-    let init = scram.init_client();
+    let init = scram.init_client(false);
     assert_eq!( init.as_str(), client_init ); 
 
-    let resp_res = scram.parse_response(server_init);
+    let resp_res = scram.parse_response(server_init, false);
     assert_eq!(resp_res.is_ok(), true);
 
     let resp = resp_res.unwrap().extract_output().unwrap();
     assert_eq!( resp.as_str(), client_final ); 
 
-    let res = scram.parse_response(server_final);
+    let res = scram.parse_response(server_final, false);
     assert_eq!(res.is_ok(), true);
 
     let el = start.elapsed();

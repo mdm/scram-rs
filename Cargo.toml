@@ -27,5 +27,4 @@ sha-1 = "0.9"
 sha2 = "0.9"
 hmac = "0.10"
 pbkdf2 = "0.7"
-#native-tls = "0.2"
 

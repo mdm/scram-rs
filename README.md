@@ -1,17 +1,18 @@
 # Scram-rs
 
-A SCRAM-SHA1 and SCRAM-SHA256 client and server.  
+A SCRAM-SHA1, SCRAM-SHA256, SCRAM-SHA512 SCRAM-SHA256-PLUS client and server.  
 
 Supports:  
 - SHA-1 hasher
 - SHA-256 hasher
 - SHA-512 hasher
-- Client
-- Server Channel Binding TLS-Server-Endpoint 256, 512
+- Client/Server sync
+- Server Channel Binding TLS-Server-Endpoint 256, 512 untested
+- Client Channel Binding TLS-Server-Endpoint 256, 512 untested
 
 Does not support:
-- Client channel binding
 - authzid (a=)
+- async (will be available after sync version become fully tested)
 
 Based on:  
 - pbkdf2
