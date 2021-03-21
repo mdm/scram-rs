@@ -2,22 +2,23 @@
 * Scram-rs
 * Copyright (C) 2021  Aleksandr Morozov
 * 
-* This program is free software: you can redistribute it and/or modify
-* it under the terms of the GNU Affero General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
-* (at your option) any later version.
-* 
+* This program is free software; you can redistribute it and/or
+* modify it under the terms of the GNU Lesser General Public
+* License as published by the Free Software Foundation; either
+* version 3 of the License, or (at your option) any later version.
+*
 * This program is distributed in the hope that it will be useful,
 * but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Affero General Public License for more details.
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+* Lesser General Public License for more details.
 * 
-* You should have received a copy of the GNU Affero General Public License
-* along with this program.  If not, see <http://www.gnu.org/licenses/>.
+* You should have received a copy of the GNU Lesser General Public License
+* along with this program; if not, write to the Free Software Foundation,
+* Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
-use sha1::{Sha1, Digest};
-use sha2::{Sha256, Digest as Digest256};
+use sha1::{Sha1, Digest as Digest1};
+use sha2::{Sha256, Sha512, Digest as Digest2};
 use hmac::{Hmac, Mac, NewMac, crypto_mac::InvalidKeyLength};
 use pbkdf2::pbkdf2;
 
@@ -70,7 +71,7 @@ impl ScramHashing for ScramSha1
     }
 }
 
-/// A `ScramProvider` which provides SCRAM-SHA-256 and SCRAM-SHA-256-PLUS (not impl)
+/// A `ScramProvider` which provides SCRAM-SHA-256 and SCRAM-SHA-256-PLUS
 pub struct ScramSha256;
 
 impl ScramHashing for ScramSha256 
@@ -99,6 +100,41 @@ impl ScramHashing for ScramSha256
 
         let mut salted = vec![0; 32];
         pbkdf2::<Hmac<Sha256>>(password, salt, iterations, &mut salted);
+
+        return Ok(salted);
+    }
+
+}
+
+/// A `ScramProvider` which provides SCRAM-SHA-512 and SCRAM-SHA-512-PLUS 
+pub struct ScramSha512;
+
+impl ScramHashing for ScramSha512 
+{
+    fn hash(data: &[u8]) -> Vec<u8> 
+    {
+        let hash = Sha512::digest(data);
+
+        return Vec::from(hash.as_slice());
+    }
+
+    fn hmac(data: &[u8], key: &[u8]) -> ScramResult<Vec<u8>> 
+    {
+        let mut mac = Hmac::<Sha512>::new_varkey(key)
+                                    .map_err(|e| scram_error_map!(ScramErrorCode::ExternalError, 
+                                        "hmac() Hmac::<Sha512> err, {}", e))?;
+        mac.update(data);
+        let result = mac.finalize();
+        let ret = Vec::from(result.into_bytes().as_slice());
+
+        return Ok(ret);
+    }
+
+    fn derive(password: &[u8], salt: &[u8], iterations: u32) -> ScramResult<Vec<u8>> 
+    {
+
+        let mut salted = vec![0; 32];
+        pbkdf2::<Hmac<Sha512>>(password, salt, iterations, &mut salted);
 
         return Ok(salted);
     }

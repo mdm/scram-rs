@@ -1,10 +1,13 @@
 [package]
 name = "scram-rs"
-version = "0.1.0"
-authors = ["Aleksandr Morozov"]
+version = "0.1.1"
+authors = ["Aleksandr Morozov <alex@nixd.org>"]
 edition = "2018"
 description="SCRAM auth lib"
-license="GPLv3"
+repository = "https://gitlab.com/relkom/scram-rs"
+keywords = ["SCRAM", "SASL"]
+categories = ["security"]
+license="LGPL-3.0-or-later"
 
 [profile.dev]
 opt-level = 0
@@ -24,5 +27,5 @@ sha-1 = "0.9"
 sha2 = "0.9"
 hmac = "0.10"
 pbkdf2 = "0.7"
-native-tls = "0.2"
+#native-tls = "0.2"
 
