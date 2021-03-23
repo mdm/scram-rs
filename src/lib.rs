@@ -17,6 +17,26 @@
 * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
+//! Scram-RS (Sync)
+//! 
+//! Provides a SASL SCRAM:
+//! - SHA1 
+//! - SHA256 
+//! - SHA512 
+//! - -PLUS
+//! 
+//! For usage see ./examples/
+//! 
+//! Files:
+//! - scram.rs contains client/server handler and private realization of the
+//!             data parser  
+//! - scram_hashing.rs contains all supported hashers implementation
+//! - scram_error.rs error reporting code
+//! - scram_common.rs a common code
+//! - scram_cb.rs a channel bind code
+//! - scram_auth.rs a authentification callbacks and interface
+
+
 pub mod scram;
 pub mod scram_cb;
 pub mod scram_auth;

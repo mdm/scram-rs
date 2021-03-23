@@ -16,16 +16,14 @@
 * along with this program; if not, write to the Free Software Foundation,
 * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
-use std::io;
 use std::fmt;
-
-//use native_tls::TlsStream;
 
 use super::scram_common::ScramType;
 use super::scram_error::{ScramResult, ScramRuntimeError, ScramErrorCode};
 use super::{scram_error, scram_error_map};
 
-pub enum ServerChannelBindType
+/// A channel binding type picked by client.
+pub(crate) enum ServerChannelBindType
 {
     /// No channel binding data.
     None,

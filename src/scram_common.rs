@@ -41,7 +41,7 @@ impl fmt::Display for ScramType
     }
 }
 
-
+/// A table of all supported versions.
 pub const SCRAM_TYPES: &'static [ScramType] = 
 &[
     ScramType{scram_name:"SCRAM-SHA-1",         scram_chan_bind: false}, 

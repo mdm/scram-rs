@@ -23,10 +23,13 @@ use super::{scram_error, scram_error_map};
 use super::scram_common::ScramCommon;
 use super::scram_hashing::ScramHashing;
 
-
+/// A authentification callback returns this enum. 
+/// 
+/// The callback should use implemented functions to generate the result!
 pub enum ScramPassword
 {
-    /// Default state for initialization
+    /// Default state for initialization!
+    /// Should never be returned from the authentification backend.
     None,
 
     /// User was not found in auth DB, anyway in order to avoid timing
@@ -55,11 +58,14 @@ pub enum ScramPassword
 
 impl ScramPassword
 {
+    /// A default initialization. A program which utilizes this crate should 
+    /// never use this function.
     pub fn default() -> Self
     {
         return Self::None;
     }
 
+    /// Internal function to generate mock salt.
     fn scram_mock_salt() -> ScramResult<Vec<u8>>
     {
         //generate mock auth nonce (todo: to statically created)
@@ -68,6 +74,12 @@ impl ScramPassword
         return Ok(mock_auth_nonce);
     }
 
+    /// A program which utilizes this crate should call this function if user was not
+    /// found in DB. The execution should not be interrupted.
+    /// 
+    /// # Throws
+    /// 
+    /// May throw an error.
     pub fn not_found<S: ScramHashing>() -> ScramResult<Self>
     {
         // generate fake data
@@ -87,8 +99,18 @@ impl ScramPassword
         return Ok(ret);
     }
 
-    /// Plaintext password was found, needs hashing.
-    pub fn found_plaintext_password<S: ScramHashing>(pass: &[u8], ) -> ScramResult<Self>
+    /// A program which utilizes this crate should call this function if user was found
+    /// but password is encoded as plain text. This function requires that the correct
+    /// [ScramHashing] which was previously used to initialize the server, should be used.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pass` - a plaintext password
+    /// 
+    /// # Throws
+    /// 
+    /// May throw an error.
+    pub fn found_plaintext_password<S: ScramHashing>(pass: &[u8]) -> ScramResult<Self>
     {
         //generate salt and iterations
         let salt = ScramPassword::scram_mock_salt()?;
@@ -105,7 +127,20 @@ impl ScramPassword
         return Ok(ret);
     }
 
-    /// a SHA-? hashed password, salt and iterations
+    /// A program which utilizes this crate should call this function if user was found
+    /// but password was salted and hashed and salt with iterations count were provided.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `salted_hashed_password` - a salted and hashed password
+    /// 
+    /// * `salt` - a salt
+    /// 
+    /// * `iterations` - iterations count
+    /// 
+    /// # Throws
+    /// 
+    /// May throw an error.
     pub fn found_secret_password(salted_hashed_password: Vec<u8>, salt: Vec<u8>, iterations: u32) -> Self
     {
         return Self::UserPasswordData
@@ -116,6 +151,7 @@ impl ScramPassword
             };
     }
 
+    /// Returns the reference to salt. Will panic! when misused.
     pub fn get_salt(&self) -> &[u8]
     {
         match *self
@@ -126,6 +162,7 @@ impl ScramPassword
         }
     }
 
+    /// Returns the iteration count. Will panic! when misused.
     pub fn get_iterations(&self) -> u32
     {
         match *self
@@ -136,6 +173,7 @@ impl ScramPassword
         }
     }
 
+    /// Returns the salted and hashed password. Will panic! when misused.
     pub fn get_salted_hashed_password(&self) -> &[u8]
     {
         match *self
@@ -147,16 +185,61 @@ impl ScramPassword
     }
 }
 
-/// A authentification backend which is behind the SCRAM lib
-/// A lib use should do the realization of this trait
-///     to access the auth database
+/// A authentification backend which is behind the SCRAM lib.
+/// A program which uses this crate should implement this trait to its auth
+/// instance.
+/// 
+/// # Examples
+/// 
+/// ```
+/// impl ScramAuthServer for AuthServer
+/// {
+///     fn get_password_for_user(&self, username: &str) -> ScramPassword
+///     {
+///         let password = match self.lookup(username)
+///         {
+///             Some(r) => ScramPassword::found_plaintext_password(r.as_bytes()),
+///             None => 
+///             {
+///                 match self.scram_type.scram_name
+///                 {
+///                     "SCRAM-SHA-256" => ScramPassword::not_found<ScramSha256>(),
+///                     "SCRAM-SHA-512" => ScramPassword::not_found<ScramSha512>(),
+///                     _ => panic!("should not happen"),
+///                 }
+///             }
+///         };
+/// 
+///         return password;
+/// 
+///     }
+/// }
+/// ```
 pub trait ScramAuthServer
 {
     fn get_password_for_user(&self, username: &str) -> ScramPassword;
 }
 
-/// A authentification backend which is behind the SCRAM lib
-///     to access auth data username:password
+/// A authentification backend which is behind the SCRAM lib.
+/// A program which uses this crate should implement this trait to its auth
+/// instance.
+/// 
+/// # Examples
+/// 
+/// ```
+/// impl ScramAuthClient for <ProgramStruct>
+/// {
+///     fn get_username(&self) -> &String
+///     {
+///         return &self.username;
+///     }
+/// 
+///     fn get_password(&self) -> &String
+///     {
+///         return &self.password;
+///     }
+/// }
+/// ```
 pub trait ScramAuthClient
 {
     fn get_username(&self) -> &String;
