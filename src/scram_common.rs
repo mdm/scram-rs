@@ -54,10 +54,24 @@ pub const SCRAM_TYPES: &'static [ScramType] =
 pub struct ScramCommon{}
 impl ScramCommon
 {
+    /// A default raw (non base64) nonce length
     pub const SCRAM_RAW_NONCE_LEN: usize = 32;
+
+    /// A mock salt default len
     pub const MOCK_AUTH_NONCE_LEN: usize = 16;
+
+    /// Default HMAC iterations
     pub const SCRAM_DEFAULT_SALT_ITER: u32 = 4096;
 
+    /// Generates random secuence of bytes
+    /// 
+    /// # Arguments
+    /// 
+    /// * `len` - a length of the array
+    /// 
+    /// # Returns
+    /// 
+    /// * [ScramResult] Ok - elements or Error
     pub fn sc_random(len: usize) -> ScramResult<Vec<u8>>
     {
         let mut data = Vec::<u8>::with_capacity(len);
@@ -80,6 +94,17 @@ impl ScramCommon
         return scram_adv.join(sep.as_ref());
     }
 
+    /// Retrieves the SCRAM type by name which are hardcoded in [SCRAM_TYPES] 
+    /// i.e SCRAM-SHA256.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `scram` - a scram auth type
+    /// 
+    /// # Returns
+    /// 
+    /// * [ScramResult] - a reference to record from table with static lifetime
+    ///                     or Error [ScramErrorCode::ExternalError] if not found
     pub fn get_scramtype<S: AsRef<str>>(scram: S) -> ScramResult<&'static ScramType>
     {
         let scram_name = scram.as_ref();

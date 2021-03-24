@@ -133,7 +133,7 @@ impl ScramHashing for ScramSha512
     fn derive(password: &[u8], salt: &[u8], iterations: u32) -> ScramResult<Vec<u8>> 
     {
 
-        let mut salted = vec![0; 32];
+        let mut salted = vec![0; 64];
         pbkdf2::<Hmac<Sha512>>(password, salt, iterations, &mut salted);
 
         return Ok(salted);

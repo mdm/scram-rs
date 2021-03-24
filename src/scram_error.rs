@@ -52,11 +52,22 @@ impl fmt::Debug for ScramRuntimeError
 
 pub enum ScramErrorCode
 {
+    /// Error happened inside lib
     InternalError,
+
+    /// Error during verification of proof or other value
     VerificationError,
+
+    /// Error which occurs outside of the lib
     ExternalError,
+
+    /// Error due malformed SCRAM message
     MalformedScramMsg,
+
+    /// Error which occure when unsupported options are included in received msg
     FeatureNotSupported,
+
+    /// Error due to protocol violation
     ProtocolViolation,
 }
 
@@ -77,22 +88,6 @@ impl fmt::Display for ScramErrorCode
 }
 
 pub type ScramResult<T> = Result<T, ScramRuntimeError>;
-
-/*impl From<base64::DecodeError> for ScramRuntimeError
-{
-    fn from(err: base64::DecodeError) -> ScramRuntimeError 
-    {
-        ScramRuntimeError::new(ScramErrorCode::ExternalError, format!("{}", err))
-    }
-}*/
-
-/*impl From<num::ParseIntError> for ScramRuntimeError
-{
-    fn from(err: num::ParseIntError) -> ScramRuntimeError
-    {
-        ScramRuntimeError::new(ScramErrorCode::MalformedScramMsg, format!("{}", err))
-    }
-}*/
 
 #[macro_export]
 macro_rules! scram_error 

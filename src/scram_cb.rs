@@ -51,19 +51,19 @@ impl fmt::Display for ServerChannelBindType
 
 impl ServerChannelBindType
 {
-    // n,,
+    /// Initializes enum as n,,
     pub fn n() -> Self
     {
         return Self::None;
     }
 
-    // y,,
+    /// Initializes enum as y,,
     pub fn y() -> Self
     {
         return Self::Unsupported;
     }
 
-    // p=tls-server-end-point
+    /// Initializes enum as p=tls-server-end-point
     pub fn tls_server_endpoint() -> Self
     {
         return Self::TlsServerEndpoint;
@@ -72,6 +72,14 @@ impl ServerChannelBindType
     /// Verifies the client initial request about the Channel Bind
     /// If client picks SCRAM-? without -PLUS extension, then it should not
     /// require any channel binding i.e n -(None) or y-(Unsupported)
+    /// 
+    /// # Arguments
+    /// 
+    /// * `st` - picked SCRAM type
+    /// 
+    /// # Returns
+    /// 
+    /// * [ScramResult] - returns nothing in payload or error
     pub fn server_initial_verify_client_cb(&self, st: &ScramType) -> ScramResult<()>
     {
         if st.scram_chan_bind == true
@@ -109,6 +117,20 @@ impl ServerChannelBindType
         }
     }
 
+    /// Server uses this function to verify the the client channel bind
+    /// in final message.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `st` - [ScramType] a current scram type
+    /// 
+    /// * `cb_attr` - a received channel binding data from client in base64 format
+    /// 
+    /// * `endpoint_hash` - a servers TLS end point certificate
+    /// 
+    /// # Returns
+    /// 
+    /// * [ScramResult] nothing in payload or error
     pub fn server_final_verify_client_cb(&mut self, 
                                         st: &ScramType, 
                                         cb_attr: &str,
@@ -193,7 +215,7 @@ impl ServerChannelBindType
         }
     }
 
-    /// convert directly from string, for server side use only
+    /// Converts channel binding type directly from string, for server side use only
     pub fn from_str<C: AsRef<str>>(cb: C) -> ScramResult<Self>
     {
         match cb.as_ref()
@@ -248,19 +270,19 @@ impl fmt::Display for ClientChannelBindingType
 
 impl ClientChannelBindingType
 {
-    /// No channel binding is required
+    /// Initializes enum as No channel binding is required
     pub fn without_chan_binding() -> Self
     {
         return Self::None;
     }
 
-    /// Client picks -PLUS and provides the endpoint cert hash
+    /// Initializes enum as Client picks -PLUS and provides the endpoint cert hash
     pub fn with_tls_server_endpoint(cb_data: Vec<u8>) -> Self
     {
         return Self::TlsServerEndpoint{cb_data: cb_data};
     }
 
-    /// Converts the type to protocol header text 
+    /// Converts the [ClientChannelBindingType] to protocol header text 
     pub fn convert2header(&self) -> &[u8]
     {
         match self
@@ -272,7 +294,7 @@ impl ClientChannelBindingType
         }
     }
 
-    // Extracts from the type the stored data
+    // Extracts from the [ClientChannelBindingType] the stored data
     pub fn convert2data(&self) -> &[u8]
     {
         match *self

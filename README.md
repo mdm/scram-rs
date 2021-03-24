@@ -20,8 +20,6 @@ Based on:
 
 Usage:  
 
-ToDo
-
-See test files in scram rs.
+see ./examples/
 
 
