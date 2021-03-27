@@ -6,7 +6,7 @@ edition = "2018"
 description="Salted Challenge Response Authentication Mechanism (SCRAM) SASL mechanism, a library which implements SCRAM logic"
 repository = "https://gitlab.com/relkom/scram-rs"
 keywords = ["SCRAM", "SASL"]
-categories = ["security", "sasl", "scram", "authentification"]
+categories = ["email", "authentication"]
 license="LGPL-3.0-or-later"
 
 [profile.dev]
