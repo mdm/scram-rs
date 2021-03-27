@@ -4,7 +4,7 @@ A SCRAM-SHA1, SCRAM-SHA256, SCRAM-SHA512 SCRAM-SHA256-PLUS client and server.
 
 Supports:  
 - SHA-1 hasher
-- SHA-256 hasher
+- SHA-256 hasher (tested with Postfix Dovecot SASL)
 - SHA-512 hasher
 - Client/Server sync
 - Server Channel Binding TLS-Server-Endpoint 256, 512 untested
