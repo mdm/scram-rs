@@ -225,7 +225,7 @@ impl<'sn> ScramNonce<'sn>
 /// If client picks SCRAM-SHA-<any>-PLUS then the developer should 
 ///     also provide the data_chanbind argument with the server
 ///     certificate endpoint i.e native_tls::TlsStream::tls_server_end_point()  
-pub struct ScramServer<'ss, S: ScramHashing, A: ScramAuthServer>
+pub struct ScramServer<'ss, S: ScramHashing, A: ScramAuthServer<S>>
 {
     /// The hasher which will be used: SHA-1 SHA-256
     hasher: PhantomData<S>,
@@ -247,7 +247,7 @@ pub struct ScramServer<'ss, S: ScramHashing, A: ScramAuthServer>
     data_chanbind: Option<Vec<u8>>
 }
 
-impl<'ss, S: ScramHashing, A: ScramAuthServer> ScramServer<'ss, S, A/*, B*/>
+impl<'ss, S: ScramHashing, A: ScramAuthServer<S>> ScramServer<'ss, S, A>
 {
     /// Returns the supported types in format SCRAM SCRAM SCRAM
     pub fn advertise_types() -> String
@@ -355,7 +355,14 @@ impl<'ss, S: ScramHashing, A: ScramAuthServer> ScramServer<'ss, S, A/*, B*/>
                 //authID is not supported
 
                 //get user
-                let sp = self.auth.get_password_for_user(user);
+                let sp = 
+                    match self.auth.get_password_for_user(user)
+                    {
+                        Some(r) => r,
+                        None => 
+                            scram_error!(ScramErrorCode::ExternalError,
+                                        "authentification server failed for unknown reason"),
+                    };
 
                 // form output
                 let output = 
@@ -1179,7 +1186,7 @@ impl<'par> ScramDataParser<'par>
 fn scram_sha256_server() 
 { 
     use std::time::Instant;
-    use super::scram_hashing::ScramSha256;
+    use super::scram_hashing::{ScramSha1, ScramSha256};
     use super::scram_auth::ScramAuthServer;
 
     struct AuthServer
@@ -1187,16 +1194,19 @@ fn scram_sha256_server()
 
     }
 
-    impl ScramAuthServer for AuthServer
+    impl ScramAuthServer<ScramSha256> for AuthServer
     {
-        fn get_password_for_user(&self, username: &str) -> ScramPassword
+        fn get_password_for_user(&self, username: &str) -> Option<ScramPassword>
         {
             let password = "pencil";
             let salt = b"[m\x99h\x9d\x125\x8e\xec\xa0K\x14\x126\xfa\x81".to_vec();
-            ScramPassword::found_secret_password(
+
+            Some(ScramPassword::found_secret_password(
                     ScramSha256::derive(password.as_bytes(), &salt, 4096).unwrap(),
                     salt, 
-                    4096)
+                    4096))
+
+                    
         }
     }
 

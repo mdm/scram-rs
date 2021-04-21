@@ -192,22 +192,14 @@ impl ScramPassword
 /// # Examples
 /// 
 /// ```
-/// impl ScramAuthServer for AuthServer
+/// impl ScramAuthServer<ScramSha256> for AuthServer
 /// {
 ///     fn get_password_for_user(&self, username: &str) -> ScramPassword
 ///     {
 ///         let password = match self.lookup(username)
 ///         {
 ///             Some(r) => ScramPassword::found_plaintext_password(r.as_bytes()),
-///             None => 
-///             {
-///                 match self.scram_type.scram_name
-///                 {
-///                     "SCRAM-SHA-256" => ScramPassword::not_found<ScramSha256>(),
-///                     "SCRAM-SHA-512" => ScramPassword::not_found<ScramSha512>(),
-///                     _ => panic!("should not happen"),
-///                 }
-///             }
+///             None => ScramPassword::not_found<ScramSha256>()
 ///         };
 /// 
 ///         return password;
@@ -215,9 +207,9 @@ impl ScramPassword
 ///     }
 /// }
 /// ```
-pub trait ScramAuthServer
+pub trait ScramAuthServer<S: ScramHashing>
 {
-    fn get_password_for_user(&self, username: &str) -> ScramPassword;
+    fn get_password_for_user(&self, username: &str) -> Option<ScramPassword>;
 }
 
 /// A authentification backend which is behind the SCRAM lib.
