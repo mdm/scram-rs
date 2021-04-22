@@ -23,6 +23,20 @@ use getrandom::getrandom;
 use super::scram_error::{ScramResult, ScramRuntimeError, ScramErrorCode};
 use super::{scram_error, scram_error_map};
 
+/// A numeric alias for the [SCRAM_TYPES]. If any changes were made in
+/// [SCRAM_TYPES] then verify that [ScramTypeAlias] is in order.
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum ScramTypeAlias
+{
+    Sha1 = 0,
+    Sha256 = 1,
+    Sha256Plus = 2,
+    Sha512 = 3,
+    Sha512Plus = 4,
+}
+
+/// A structured data about supported mechanisms
+#[derive(Debug, PartialEq)]
 pub struct ScramType
 {
     /// Scram type encoded as in RFC without trailing \r\n or \n
@@ -75,8 +89,9 @@ impl ScramCommon
     pub fn sc_random(len: usize) -> ScramResult<Vec<u8>>
     {
         let mut data = Vec::<u8>::with_capacity(len);
-        getrandom(&mut data).map_err(|e| scram_error_map!(ScramErrorCode::ExternalError, 
-                                                        "getrandom err, {}", e))?;
+        getrandom(&mut data)
+            .map_err(|e| scram_error_map!(ScramErrorCode::ExternalError, 
+                                            "getrandom err, {}", e))?;
 
         return Ok(data);
     }
@@ -119,5 +134,28 @@ impl ScramCommon
 
         scram_error!(ScramErrorCode::ExternalError,
                     "unknown scram type: {}", scram_name);
+    }
+
+    /// Retrieves the SCRAM type from [SCRAM_TYPES] by the numeric alias which 
+    /// are hardcoded in [ScramTypeAlias] 
+    /// i.e SCRAM-SHA256.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `scram` - a scram numeric auth type [ScramTypeAlias]
+    /// 
+    /// # Returns
+    /// 
+    /// * [ScramResult] - a reference to record from table with static lifetime
+    ///                     or Error [ScramErrorCode::ExternalError] if not found
+    pub fn get_scramtype_numeric(scram: ScramTypeAlias) -> ScramResult<&'static ScramType>
+    {
+        let scram_offset = *(&scram) as usize;
+        match SCRAM_TYPES.get(scram_offset)
+        {
+            Some(r) => return Ok(r),
+            None => scram_error!(ScramErrorCode::ExternalError,
+                        "unknown scram type: {:?}", scram)
+        }
     }
 }
