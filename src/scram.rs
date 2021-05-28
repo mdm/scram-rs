@@ -368,7 +368,7 @@ impl<'ss, S: ScramHashing, A: ScramAuthServer<S>> ScramServer<'ss, S, A>
                 let output = 
                     [
                         "r=", nonce, &self.server_nonce, 
-                        ",s=", &base64::encode(sp.get_salt()), 
+                        ",s=", sp.get_salt_base64(), 
                         ",i=", &sp.get_iterations().to_string()
                     ].concat();
 
@@ -422,7 +422,7 @@ impl<'ss, S: ScramHashing, A: ScramAuthServer<S>> ScramServer<'ss, S, A>
                 let server_first = 
                             [
                                 "r=", &nonce, 
-                                ",s=", &base64::encode(self.sp.get_salt()),
+                                ",s=", self.sp.get_salt_base64(),
                                 ",i=", &self.sp.get_iterations().to_string(),
                             ].concat();
 
@@ -876,6 +876,7 @@ impl<'par> ScramDataParser<'par>
         }
     }
 
+    #[allow(dead_code)]
     #[inline]
     fn foresee_char(&mut self) -> Option<char>
     {
@@ -1186,7 +1187,7 @@ impl<'par> ScramDataParser<'par>
 fn scram_sha256_server() 
 { 
     use std::time::Instant;
-    use super::scram_hashing::{ScramSha1, ScramSha256};
+    use super::scram_hashing::{ScramSha256};
     use super::scram_auth::ScramAuthServer;
 
     struct AuthServer
@@ -1196,14 +1197,14 @@ fn scram_sha256_server()
 
     impl ScramAuthServer<ScramSha256> for AuthServer
     {
-        fn get_password_for_user(&self, username: &str) -> Option<ScramPassword>
+        fn get_password_for_user(&self, _username: &str) -> Option<ScramPassword>
         {
             let password = "pencil";
             let salt = b"[m\x99h\x9d\x125\x8e\xec\xa0K\x14\x126\xfa\x81".to_vec();
 
             Some(ScramPassword::found_secret_password(
                     ScramSha256::derive(password.as_bytes(), &salt, 4096).unwrap(),
-                    salt, 
+                    base64::encode(salt), 
                     4096))
 
                     
@@ -1219,18 +1220,18 @@ fn scram_sha256_server()
     }
 
 
-    let username = "user";
-    let password = "pencil";
+    let _username = "user";
+    let _password = "pencil";
     let client_nonce = "rOprNGfwEbeRWgbNEkqO";
-    let client_nonce_dec = base64::decode(client_nonce).unwrap();
+    let _client_nonce_dec = base64::decode(client_nonce).unwrap();
     let client_init = "n,,n=user,r=rOprNGfwEbeRWgbNEkqO";
     let server_init = "r=rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0,s=W22ZaJ0SNY7soEsUEjb6gQ==,i=4096";
     let server_nonce = "%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0";
-    let server_nonce_dec = b"\x86\xf6\x03\xa5e\x1a\xd9\x16\x93\x08\x07\xee\xc4R%\x8e\x13e\x16M".to_vec();
+    let _server_nonce_dec = b"\x86\xf6\x03\xa5e\x1a\xd9\x16\x93\x08\x07\xee\xc4R%\x8e\x13e\x16M".to_vec();
     let client_final = "c=biws,r=rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0,p=dHzbZapWIk4jUhN+Ute9ytag9zjfMHgsqmmiz7AndVQ=";
     let server_final = "v=6rriTRBi23WpRR/wtup+mMhUZUn/dB5nLTJRsjl95G4=";
     
-    let start = Instant::now();
+    let _start = Instant::now();
 
     let serv = AuthServer::new();
     let nonce = ScramNonce::Base64(server_nonce);
@@ -1304,8 +1305,8 @@ fn scram_sha256_works()
     let client_nonce_dec = base64::decode(client_nonce).unwrap();
     let client_init = "n,,n=user,r=rOprNGfwEbeRWgbNEkqO";
     let server_init = "r=rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0,s=W22ZaJ0SNY7soEsUEjb6gQ==,i=4096";
-    let server_nonce = "%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0";
-    let server_nonce_dec = b"\x86\xf6\x03\xa5e\x1a\xd9\x16\x93\x08\x07\xee\xc4R%\x8e\x13e\x16M";
+    let _server_nonce = "%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0";
+    let _server_nonce_dec = b"\x86\xf6\x03\xa5e\x1a\xd9\x16\x93\x08\x07\xee\xc4R%\x8e\x13e\x16M";
     let client_final = "c=biws,r=rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0,p=dHzbZapWIk4jUhN+Ute9ytag9zjfMHgsqmmiz7AndVQ=";
     let server_final = "v=6rriTRBi23WpRR/wtup+mMhUZUn/dB5nLTJRsjl95G4=";
     

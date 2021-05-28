@@ -18,12 +18,12 @@
 */
 
 use sha1::{Sha1, Digest as Digest1};
-use sha2::{Sha256, Sha512, Digest as Digest2};
-use hmac::{Hmac, Mac, NewMac, crypto_mac::InvalidKeyLength};
+use sha2::{Sha256, Sha512};
+use hmac::{Hmac, Mac, NewMac};
 use pbkdf2::pbkdf2;
 
 use super::scram_error::{ScramResult, ScramRuntimeError, ScramErrorCode};
-use super::{scram_error, scram_error_map};
+use super::{scram_error_map};
 
 
 pub trait ScramHashing 
@@ -53,9 +53,12 @@ impl ScramHashing for ScramSha1
     fn hmac(data: &[u8], key: &[u8]) -> ScramResult<Vec<u8>> 
     {
         type HmacSha1 = Hmac<Sha1>;
-        let mut mac = HmacSha1::new_varkey(key)
-                                .map_err(|e| scram_error_map!(ScramErrorCode::ExternalError, 
-                                                                "hmac() HmacSha1 err, {}", e))?;
+        let mut mac = 
+            HmacSha1::new_from_slice(key).map_err(|e| 
+                        scram_error_map!(ScramErrorCode::ExternalError, 
+                                        "hmac() HmacSha1 err, {}", e)
+        )?;
+
         mac.update(data);
         let result = mac.finalize();
         
@@ -85,9 +88,15 @@ impl ScramHashing for ScramSha256
 
     fn hmac(data: &[u8], key: &[u8]) -> ScramResult<Vec<u8>> 
     {
-        let mut mac = Hmac::<Sha256>::new_varkey(key)
-                                    .map_err(|e| scram_error_map!(ScramErrorCode::ExternalError, 
-                                        "hmac() Hmac::<Sha256> err, {}", e))?;
+        type HmacSha256 = Hmac<Sha256>;
+
+        let mut mac = 
+            HmacSha256::new_from_slice(key)
+                        .map_err(|e| 
+                                scram_error_map!(ScramErrorCode::ExternalError, 
+                                        "hmac() Hmac::<Sha256> err, {}", e)
+        )?;
+
         mac.update(data);
         let result = mac.finalize();
         let ret = Vec::from(result.into_bytes().as_slice());
@@ -120,9 +129,13 @@ impl ScramHashing for ScramSha512
 
     fn hmac(data: &[u8], key: &[u8]) -> ScramResult<Vec<u8>> 
     {
-        let mut mac = Hmac::<Sha512>::new_varkey(key)
-                                    .map_err(|e| scram_error_map!(ScramErrorCode::ExternalError, 
-                                        "hmac() Hmac::<Sha512> err, {}", e))?;
+        type HmacSha512 = Hmac<Sha512>;
+        let mut mac = 
+            HmacSha512::new_from_slice(key).map_err(|e| 
+                    scram_error_map!(ScramErrorCode::ExternalError, 
+                                    "hmac() Hmac::<Sha512> err, {}", e)
+            )?;
+
         mac.update(data);
         let result = mac.finalize();
         let ret = Vec::from(result.into_bytes().as_slice());

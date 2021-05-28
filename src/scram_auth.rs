@@ -17,8 +17,7 @@
 * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
-use super::scram_error::{ScramResult, ScramRuntimeError, ScramErrorCode};
-use super::{scram_error, scram_error_map};
+use super::scram_error::{ScramResult};
 
 use super::scram_common::ScramCommon;
 use super::scram_hashing::ScramHashing;
@@ -39,7 +38,7 @@ pub enum ScramPassword
         /// salted and hashed (SHA-?) password
         salted_hashed_password: Vec<u8>,
         /// plaintext salt used (non base64)
-        salt: Vec<u8>,
+        salt_b64: String,
         /// iteration count
         iterations: u32,
     },
@@ -50,7 +49,7 @@ pub enum ScramPassword
         /// salted and hashed (SHA-?) password
         salted_hashed_password: Vec<u8>,
         /// plaintext salt used (non base64)
-        salt: Vec<u8>,
+        salt_b64: String,
         /// iteration count
         iterations: u32,
     }
@@ -92,14 +91,14 @@ impl ScramPassword
         let ret = Self::UserNotFound
             {
                 salted_hashed_password: salted_password,
-                salt: salt,
+                salt_b64: base64::encode(salt),
                 iterations: ScramCommon::SCRAM_DEFAULT_SALT_ITER,
             };
 
         return Ok(ret);
     }
 
-    /// A program which utilizes this crate should call this function if user was found
+    /// A program which uses this crate should call this function if user was found
     /// but password is encoded as plain text. This function requires that the correct
     /// [ScramHashing] which was previously used to initialize the server, should be used.
     /// 
@@ -120,8 +119,37 @@ impl ScramPassword
         let ret = Self::UserPasswordData
             {
                 salted_hashed_password: salted_password,
-                salt: salt,
+                salt_b64: base64::encode(salt),
                 iterations: ScramCommon::SCRAM_DEFAULT_SALT_ITER,
+            };
+
+        return Ok(ret);
+    }
+
+    /// A program which uses this crate should call this function if user was found
+    /// but password is encoded as plain text and server uses custom round number. This function 
+    /// requires that the correct [ScramHashing] which was previously used to initialize 
+    /// the server, should be used.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pass` - a plaintext password
+    /// 
+    /// # Throws
+    /// 
+    /// May throw an error.
+    pub fn found_plaintext_password_with_rounds<S: ScramHashing>(pass: &[u8], rounds: u32) -> ScramResult<Self>
+    {
+        //generate salt and iterations
+        let salt = ScramPassword::scram_mock_salt()?;
+
+        let salted_password = S::derive(pass, &salt, rounds)?;
+
+        let ret = Self::UserPasswordData
+            {
+                salted_hashed_password: salted_password,
+                salt_b64: base64::encode(salt),
+                iterations: rounds,
             };
 
         return Ok(ret);
@@ -141,35 +169,37 @@ impl ScramPassword
     /// # Throws
     /// 
     /// May throw an error.
-    pub fn found_secret_password(salted_hashed_password: Vec<u8>, salt: Vec<u8>, iterations: u32) -> Self
+    pub fn found_secret_password(salted_hashed_password: Vec<u8>, salt_base64: String, iterations: u32) -> Self
     {
         return Self::UserPasswordData
             {
                 salted_hashed_password: salted_hashed_password,
-                salt: salt,
+                salt_b64: salt_base64,
                 iterations: iterations,
             };
     }
 
     /// Returns the reference to salt. Will panic! when misused.
-    pub fn get_salt(&self) -> &[u8]
+    #[allow(unused_variables)]
+    pub fn get_salt_base64(&self) -> &String
     {
         match *self
         {
             Self::None => panic!("misuse get_salt()"),
-            Self::UserNotFound{ref salted_hashed_password, ref salt, ref iterations} => return &salt,
-            Self::UserPasswordData{ref salted_hashed_password, ref salt, ref iterations} => return &salt,
+            Self::UserNotFound{ref salted_hashed_password, ref salt_b64, ref iterations} => return salt_b64,
+            Self::UserPasswordData{ref salted_hashed_password, ref salt_b64, ref iterations} => return salt_b64,
         }
     }
 
     /// Returns the iteration count. Will panic! when misused.
+    #[allow(unused_variables)]
     pub fn get_iterations(&self) -> u32
     {
         match *self
         {
             Self::None => panic!("misuse get_iterations()"),
-            Self::UserNotFound{ref salted_hashed_password, ref salt, ref iterations} => return *iterations,
-            Self::UserPasswordData{ref salted_hashed_password, ref salt, ref iterations} => return *iterations,
+            Self::UserNotFound{ref salted_hashed_password, ref salt_b64, ref iterations} => return *iterations,
+            Self::UserPasswordData{ref salted_hashed_password, ref salt_b64, ref iterations} => return *iterations,
         }
     }
 

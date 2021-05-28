@@ -20,7 +20,7 @@ use std::fmt;
 
 use super::scram_common::ScramType;
 use super::scram_error::{ScramResult, ScramRuntimeError, ScramErrorCode};
-use super::{scram_error, scram_error_map};
+use super::{scram_error};
 
 /// A channel binding type picked by client.
 pub(crate) enum ServerChannelBindType
@@ -64,6 +64,7 @@ impl ServerChannelBindType
     }
 
     /// Initializes enum as p=tls-server-end-point
+    #[allow(dead_code)]
     pub fn tls_server_endpoint() -> Self
     {
         return Self::TlsServerEndpoint;
@@ -229,6 +230,7 @@ impl ServerChannelBindType
         }
     }
 
+    #[allow(dead_code)]
     pub fn convert2header(&self) -> &[u8]
     {
         match self

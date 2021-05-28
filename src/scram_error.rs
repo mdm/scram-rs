@@ -18,7 +18,6 @@
 */
 
 use std::fmt;
-use std::num;
 
 pub struct ScramRuntimeError 
 {
