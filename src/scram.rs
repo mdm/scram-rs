@@ -632,7 +632,7 @@ impl<'sc, S: ScramHashing, A: ScramAuthClient> ScramClient<'sc, S, A>
             ScramData::SmsgInitial{nonce, salt, itrcnt} => 
             {
                 //validate iterations
-                if itrcnt == 0 || itrcnt > 100000
+                if itrcnt == 0 || itrcnt > 999999999
                 {
                     scram_error!(ScramErrorCode::InternalError, 
                                 "iterations count is not appropriate: i='{}'", itrcnt);

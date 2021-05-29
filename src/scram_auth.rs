@@ -127,9 +127,9 @@ impl ScramPassword
     }
 
     /// A program which uses this crate should call this function if user was found
-    /// but password is encoded as plain text and server uses custom round number. This function 
-    /// requires that the correct [ScramHashing] which was previously used to initialize 
-    /// the server, should be used.
+    /// but password is encoded as plain text and server uses custom iteration number. 
+    /// A function requires that the correct [ScramHashing] which was previously used to 
+    /// initialize the server, should be used.
     /// 
     /// # Arguments
     /// 
@@ -138,18 +138,21 @@ impl ScramPassword
     /// # Throws
     /// 
     /// May throw an error.
-    pub fn found_plaintext_password_with_rounds<S: ScramHashing>(pass: &[u8], rounds: u32) -> ScramResult<Self>
+    pub fn found_plaintext_password_with_iterations<S>(
+            pass: &[u8], 
+            iterations: u32) -> ScramResult<Self>
+    where S: ScramHashing
     {
         //generate salt and iterations
         let salt = ScramPassword::scram_mock_salt()?;
 
-        let salted_password = S::derive(pass, &salt, rounds)?;
+        let salted_password = S::derive(pass, &salt, iterations)?;
 
         let ret = Self::UserPasswordData
             {
                 salted_hashed_password: salted_password,
                 salt_b64: base64::encode(salt),
-                iterations: rounds,
+                iterations: iterations,
             };
 
         return Ok(ret);
@@ -169,7 +172,10 @@ impl ScramPassword
     /// # Throws
     /// 
     /// May throw an error.
-    pub fn found_secret_password(salted_hashed_password: Vec<u8>, salt_base64: String, iterations: u32) -> Self
+    pub fn found_secret_password(
+        salted_hashed_password: Vec<u8>, 
+        salt_base64: String, 
+        iterations: u32) -> Self
     {
         return Self::UserPasswordData
             {
@@ -177,6 +183,57 @@ impl ScramPassword
                 salt_b64: salt_base64,
                 iterations: iterations,
             };
+    }
+
+    /// A function which can be used for salted password generation from
+    /// provided parameters.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pass_plain` - a reference to the password in plain format
+    /// 
+    /// * `salt_plain` - a optional value which allows to set custom salt in
+    /// in plain text.
+    /// 
+    /// * `iter` - an aoptional value which allows to set custom digit of
+    /// iterations. The default is [ScramCommon::SCRAM_DEFAULT_SALT_ITER]
+    /// 
+    /// # Throws
+    /// May throw an error.
+    /// 
+    /// # Returns
+    /// 
+    /// Instance of [ScramPassword::UserPasswordData] 
+    pub fn salt_password_with_params<S>(
+        pass_plain: &[u8], 
+        salt_plain: Option<&[u8]>, 
+        iter: Option<u32>) -> ScramResult<Self>
+    where S: ScramHashing
+    {
+        let salt = 
+            match salt_plain
+            {
+                Some(r) => r.to_vec(),
+                None => ScramPassword::scram_mock_salt()?
+            };
+        
+        let iterations = 
+            match iter
+            {
+                Some(r) => r,
+                None => ScramCommon::SCRAM_DEFAULT_SALT_ITER
+            };
+
+        let salted_password = S::derive(pass_plain, &salt, iterations)?;
+
+        let ret = Self::UserPasswordData
+            {
+                salted_hashed_password: salted_password,
+                salt_b64: base64::encode(salt),
+                iterations: iterations,
+            };
+
+        return Ok(ret);
     }
 
     /// Returns the reference to salt. Will panic! when misused.
@@ -292,3 +349,31 @@ fn test_speed()
 
 }
 
+#[test]
+fn test_password_gen()
+{
+    use std::time::Instant;
+    use super::scram_hashing::ScramSha256;
+
+    let start = Instant::now();
+
+    let res = 
+        ScramPassword::salt_password_with_params::<ScramSha256>(
+            b"pencil", 
+            Some(b"test"), 
+            Some(4096)
+        );
+
+    let el = start.elapsed();
+    println!("test_password_gen: {:?}", el);
+
+    assert_eq!(res.is_ok(), true, "{}", res.err().unwrap());
+
+    let res = res.unwrap();
+
+    assert_eq!(res.get_iterations(), 4096);
+    assert_eq!(res.get_salt_base64().as_str(), "dGVzdA==");
+    assert_eq!(res.get_salted_hashed_password(), base64::decode("afBEmfdaTuiwYy1yoCIQ8XJJ1Awzo3Ha5Mf2aLTRHhs=").unwrap());
+
+    return;
+}

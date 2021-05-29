@@ -1,6 +1,6 @@
 [package]
 name = "scram-rs"
-version = "0.1.5"
+version = "0.1.6"
 authors = ["Aleksandr Morozov <alex@nixd.org>"]
 edition = "2018"
 description="Salted Challenge Response Authentication Mechanism (SCRAM) SASL mechanism, a library which implements SCRAM logic"
