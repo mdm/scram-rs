@@ -355,14 +355,13 @@ impl<'ss, S: ScramHashing, A: ScramAuthServer<S>> ScramServer<'ss, S, A>
                 //authID is not supported
 
                 //get user
-                let sp = 
-                    match self.auth.get_password_for_user(user)
-                    {
-                        Some(r) => r,
-                        None => 
-                            scram_error!(ScramErrorCode::ExternalError,
-                                        "authentification server failed for unknown reason"),
-                    };
+                let sp = self.auth.get_password_for_user(user);
+
+                if sp.is_ok() == false
+                {
+                    scram_error!(ScramErrorCode::ExternalError,
+                        "authentification server failed for unknown reason");
+                }
 
                 // form output
                 let output = 
@@ -1197,15 +1196,15 @@ fn scram_sha256_server()
 
     impl ScramAuthServer<ScramSha256> for AuthServer
     {
-        fn get_password_for_user(&self, _username: &str) -> Option<ScramPassword>
+        fn get_password_for_user(&self, _username: &str) -> ScramPassword
         {
             let password = "pencil";
             let salt = b"[m\x99h\x9d\x125\x8e\xec\xa0K\x14\x126\xfa\x81".to_vec();
 
-            Some(ScramPassword::found_secret_password(
+            ScramPassword::found_secret_password(
                     ScramSha256::derive(password.as_bytes(), &salt, 4096).unwrap(),
                     base64::encode(salt), 
-                    4096))
+                    4096)
 
                     
         }

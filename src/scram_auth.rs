@@ -64,6 +64,16 @@ impl ScramPassword
         return Self::None;
     }
 
+    /// Returns true if [ScramPassword] is diffrent than None
+    pub fn is_ok(&self) -> bool
+    {
+        match *self
+        {
+            Self::None => return false,
+            _ => return true,
+        }
+    }
+
     /// Internal function to generate mock salt.
     fn scram_mock_salt() -> ScramResult<Vec<u8>>
     {
@@ -296,7 +306,7 @@ impl ScramPassword
 /// ```
 pub trait ScramAuthServer<S: ScramHashing>
 {
-    fn get_password_for_user(&self, username: &str) -> Option<ScramPassword>;
+    fn get_password_for_user(&self, username: &str) -> ScramPassword;
 }
 
 /// A authentification backend which is behind the SCRAM lib.
