@@ -204,16 +204,16 @@ impl ScramPassword
     /// # Returns
     /// 
     /// Instance of [ScramPassword::UserPasswordData] 
-    pub fn salt_password_with_params<S>(
-        pass_plain: &[u8], 
-        salt_plain: Option<&[u8]>, 
+    pub fn salt_password_with_params<U, S>(
+        pass_plain: U, 
+        salt_plain: Option<Vec<u8>>, 
         iter: Option<u32>) -> ScramResult<Self>
-    where S: ScramHashing
+    where S: ScramHashing, U: AsRef<[u8]>
     {
         let salt = 
             match salt_plain
             {
-                Some(r) => r.to_vec(),
+                Some(r) => r,
                 None => ScramPassword::scram_mock_salt()?
             };
         
@@ -224,7 +224,7 @@ impl ScramPassword
                 None => ScramCommon::SCRAM_DEFAULT_SALT_ITER
             };
 
-        let salted_password = S::derive(pass_plain, &salt, iterations)?;
+        let salted_password = S::derive(pass_plain.as_ref(), &salt, iterations)?;
 
         let ret = Self::UserPasswordData
             {
@@ -358,9 +358,9 @@ fn test_password_gen()
     let start = Instant::now();
 
     let res = 
-        ScramPassword::salt_password_with_params::<ScramSha256>(
-            b"pencil", 
-            Some(b"test"), 
+        ScramPassword::salt_password_with_params::<_, ScramSha256>(
+            "pencil".to_string().into_bytes(), 
+            Some("test".to_string().into_bytes()), 
             Some(4096)
         );
 
