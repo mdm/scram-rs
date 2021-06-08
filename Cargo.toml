@@ -31,7 +31,7 @@ pbkdf2 = "0.8"
 async-trait = "0.1"
 
 [dev-dependencies]
-tokio-test = "*"
+tokio-test = "0.4"
 
 [[example]]
 name = "scram_client"
