@@ -17,6 +17,8 @@
 * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
+use async_trait::async_trait;
+
 use super::scram_error::{ScramResult};
 
 use super::scram_common::ScramCommon;
@@ -25,6 +27,7 @@ use super::scram_hashing::ScramHashing;
 /// A authentification callback returns this enum. 
 /// 
 /// The callback should use implemented functions to generate the result!
+#[derive(Debug)]
 pub enum ScramPassword
 {
     /// Default state for initialization!
@@ -78,7 +81,8 @@ impl ScramPassword
     fn scram_mock_salt() -> ScramResult<Vec<u8>>
     {
         //generate mock auth nonce (todo: to statically created)
-        let mock_auth_nonce = ScramCommon::sc_random(ScramCommon::MOCK_AUTH_NONCE_LEN)?;
+        let mock_auth_nonce = 
+            ScramCommon::sc_random(ScramCommon::MOCK_AUTH_NONCE_LEN)?;
 
         return Ok(mock_auth_nonce);
     }
@@ -289,14 +293,28 @@ impl ScramPassword
 /// # Examples
 /// 
 /// ```
+/// struct AuthServer
+/// {
+///     password: String,   
+/// }
+/// 
+/// impl AuthServer
+/// {
+///       fn lookup(&self, username: &str) -> Option<String>
+///         { return Some(self.password.clone());}
+/// }
+/// use async_trait::async_trait; 
+/// use scram_rs::scram_error::ScramResult;
+/// use scram_rs::scram_hashing::ScramSha256;
+/// use scram_rs::scram_auth::{ScramAuthServer, ScramPassword};
 /// impl ScramAuthServer<ScramSha256> for AuthServer
 /// {
-///     fn get_password_for_user(&self, username: &str) -> ScramPassword
+///     fn get_password_for_user(&self, username: &str) -> ScramResult<ScramPassword>
 ///     {
 ///         let password = match self.lookup(username)
 ///         {
-///             Some(r) => ScramPassword::found_plaintext_password(r.as_bytes()),
-///             None => ScramPassword::not_found<ScramSha256>()
+///             Some(r) => ScramPassword::found_plaintext_password::<ScramSha256>(r.as_bytes()),
+///             None => ScramPassword::not_found::<ScramSha256>()
 ///         };
 /// 
 ///         return password;
@@ -306,7 +324,50 @@ impl ScramPassword
 /// ```
 pub trait ScramAuthServer<S: ScramHashing>
 {
-    fn get_password_for_user(&self, username: &str) -> ScramPassword;
+    fn get_password_for_user(&self, username: &str) -> ScramResult<ScramPassword>;
+}
+
+/// A authentification backend which is behind the SCRAM lib.
+/// A program which uses this crate should implement this trait to its auth
+/// instance.
+/// 
+/// # Examples
+/// 
+/// ```
+/// struct AuthServer
+/// {
+///     password: String,   
+/// }
+/// 
+/// impl AuthServer
+/// {
+///       fn lookup(&self, username: &str) -> Option<String>
+///         { return Some(self.password.clone());}
+/// }
+/// use async_trait::async_trait; 
+/// use scram_rs::scram_error::ScramResult;
+/// use scram_rs::scram_hashing::ScramSha256;
+/// use scram_rs::scram_auth::{AsyncScramAuthServer, ScramPassword};
+/// #[async_trait]
+/// impl AsyncScramAuthServer<ScramSha256> for AuthServer
+/// {
+///     async fn get_password_for_user(&self, username: &str) -> ScramResult<ScramPassword>
+///     {
+///         let password = match self.lookup(username)
+///         {
+///             Some(r) => ScramPassword::found_plaintext_password::<ScramSha256>(r.as_bytes()),
+///             None => ScramPassword::not_found::<ScramSha256>()
+///         };
+/// 
+///         return password;
+/// 
+///     }
+/// }
+/// ```
+#[async_trait]
+pub trait AsyncScramAuthServer<S: ScramHashing>
+{
+    async fn get_password_for_user(&self, username: &str) -> ScramResult<ScramPassword>;
 }
 
 /// A authentification backend which is behind the SCRAM lib.
@@ -333,6 +394,36 @@ pub trait ScramAuthClient
 {
     fn get_username(&self) -> &String;
     fn get_password(&self) -> &String;
+}
+
+
+/// A authentification backend which is behind the SCRAM lib.
+/// A program which uses this crate should implement this trait to its auth
+/// instance.
+/// 
+/// # Examples
+/// 
+/// ```
+/// use async_trait::async_trait; 
+/// #[async_trait]
+/// impl AsyncScramAuthClient for <ProgramStruct>
+/// {
+///     async fn get_username(&self) -> &String
+///     {
+///         return &self.username;
+///     }
+/// 
+///     async fn get_password(&self) -> &String
+///     {
+///         return &self.password;
+///     }
+/// }
+/// ```
+#[async_trait]
+pub trait AsyncScramAuthClient
+{
+    async fn get_username(&self) -> &String;
+    async fn get_password(&self) -> &String;
 }
 
 #[test]

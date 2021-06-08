@@ -1,10 +1,11 @@
 
 
-use scram_rs::scram_error::ScramResult;
-use scram_rs::scram_hashing::ScramSha256;
-use scram_rs::scram_auth::ScramAuthClient;
-use scram_rs::scram_cb::ClientChannelBindingType;
-use scram_rs::scram::{ScramNonce, ScramClient};
+use scram_rs::ScramResult;
+use scram_rs::ScramSha256;
+use scram_rs::ScramAuthClient;
+use scram_rs::ScramNonce;
+use scram_rs::ClientChannelBindingType;
+use scram_rs::scram_sync::SyncScramClient;
 
 struct AuthClient
 {
@@ -38,7 +39,8 @@ fn mock_stream_recv() -> String
     return String::from("answer");
 }
 
-pub fn scram_scha256() -> ScramResult<()>
+/// This example will not run, because it requires server, see tests in scram_sync.rs
+pub fn main() -> ScramResult<()>
 {
     // Channel binding is not required (i.e same as ChannelBinding::None)
     let cbt = ClientChannelBindingType::without_chan_binding();
@@ -50,11 +52,12 @@ pub fn scram_scha256() -> ScramResult<()>
     let nonce = ScramNonce::none();
 
     // create client instance
-    let mut scram_res = ScramClient::<ScramSha256, AuthClient>::new(&ac, nonce, cbt)?;
+    let mut scram_res = 
+        SyncScramClient::<ScramSha256, AuthClient>::new(&ac, nonce, cbt)?;
 
     // get initial packet
 
-    let initial_msg = scram_res.init_client(true);
+    let _initial_msg = scram_res.init_client(true);
 
     // send to server
     // stream.send(initial_msg);
@@ -63,7 +66,7 @@ pub fn scram_scha256() -> ScramResult<()>
     let answer = mock_stream_recv();
     let res = scram_res.parse_response_base64(answer)?;
 
-    let msg = res.extract_output()?;
+    let _msg = res.extract_output()?;
     // send to server
     // stream.send(msg);
 

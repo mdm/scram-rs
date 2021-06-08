@@ -1,6 +1,6 @@
 [package]
 name = "scram-rs"
-version = "0.1.8"
+version = "0.2.0"
 authors = ["Aleksandr Morozov <alex@nixd.org>"]
 edition = "2018"
 description="Salted Challenge Response Authentication Mechanism (SCRAM) SASL mechanism, a library which implements SCRAM logic"
@@ -28,3 +28,19 @@ sha2 = "0.9"
 hmac = "0.11"
 pbkdf2 = "0.8"
 
+async-trait = "0.1"
+
+[dev-dependencies]
+tokio-test = "*"
+
+[[example]]
+name = "scram_client"
+
+[[example]]
+name = "scram_server"
+
+[[example]]
+name = "scram_server_async"
+
+[[example]]
+name = "scram_client_async"

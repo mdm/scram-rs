@@ -138,7 +138,7 @@ impl ServerChannelBindType
                                         endpoint_hash: Option<&std::vec::Vec<u8>>) -> ScramResult<()>
     {
         // verify input
-        //If we are not using channel binding, the binding data is expected
+        // If we are not using channel binding, the binding data is expected
         // to always be "biws", which is "n,," base64-encoded, or "eSws",
         // which is "y,,".  We also have to check whether the flag is the same
         // one that the client originally sent. auth-scram_8c_source.c:1310

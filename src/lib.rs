@@ -17,7 +17,7 @@
 * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
-//! Scram-RS (Sync)
+//! Scram-RS (Sync and Async)
 //! 
 //! Provides a SASL SCRAM:
 //! - SHA1 
@@ -28,14 +28,25 @@
 //! For usage see ./examples/
 //! 
 //! Files:
-//! - scram.rs contains client/server handler and private realization of the
-//!             data parser  
+//! - scram.rs contains client/server sync and async protocol handler
+//! - scram_sync.rs a synchronious realization of the protocol handler
+//! - scram_async.rs an asynchronious realization of the protocol handler
+//! - scram_parser.rs a scram message parser
+//! - scram_state.rs a global state of the protocol handler
 //! - scram_hashing.rs contains all supported hashers implementation
 //! - scram_error.rs error reporting code
 //! - scram_common.rs a common code
 //! - scram_cb.rs a channel bind code
 //! - scram_auth.rs a authentification callbacks and interface
 
+extern crate async_trait;
+extern crate getrandom;
+extern crate base64;
+extern crate pbkdf2;
+extern crate hmac;
+extern crate sha2;
+extern crate sha1;
+extern crate md5;
 
 pub mod scram;
 pub mod scram_cb;
@@ -43,3 +54,16 @@ pub mod scram_auth;
 pub mod scram_hashing;
 pub mod scram_common;
 pub mod scram_error;
+pub mod scram_async;
+pub mod scram_parser;
+pub mod scram_state;
+pub mod scram_sync;
+
+pub use scram::*;
+pub use scram_auth::*;
+pub use scram_common::*;
+pub use scram_cb::ClientChannelBindingType;
+pub use scram_hashing::*;
+pub use scram_error::*;
+
+pub use async_trait::async_trait;

@@ -89,6 +89,7 @@ impl ScramCommon
     pub fn sc_random(len: usize) -> ScramResult<Vec<u8>>
     {
         let mut data = Vec::<u8>::with_capacity(len);
+        
         getrandom(&mut data)
             .map_err(|e| scram_error_map!(ScramErrorCode::ExternalError, 
                                             "getrandom err, {}", e))?;
