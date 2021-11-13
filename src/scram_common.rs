@@ -86,19 +86,20 @@ impl ScramCommon
     /// # Returns
     /// 
     /// * [ScramResult] Ok - elements or Error
-    pub fn sc_random(len: usize) -> ScramResult<Vec<u8>>
+    pub 
+    fn sc_random(len: usize) -> ScramResult<Vec<u8>>
     {
         let mut data = Vec::<u8>::with_capacity(len);
         
         getrandom(&mut data)
-            .map_err(|e| scram_error_map!(ScramErrorCode::ExternalError, 
-                                            "getrandom err, {}", e))?;
+            .map_err(|e| scram_error_map!(ScramErrorCode::ExternalError, "getrandom err, {}", e))?;
 
         return Ok(data);
     }
 
     /// Output all supported types with separator
-    pub fn adrvertise<S: AsRef<str>>(sep: S) -> String
+    pub 
+    fn adrvertise<S: AsRef<str>>(sep: S) -> String
     {
         let mut scram_adv: Vec<&str> = Vec::with_capacity(SCRAM_TYPES.len());
 
@@ -121,7 +122,8 @@ impl ScramCommon
     /// 
     /// * [ScramResult] - a reference to record from table with static lifetime
     ///                     or Error [ScramErrorCode::ExternalError] if not found
-    pub fn get_scramtype<S: AsRef<str>>(scram: S) -> ScramResult<&'static ScramType>
+    pub 
+    fn get_scramtype<S: AsRef<str>>(scram: S) -> ScramResult<&'static ScramType>
     {
         let scram_name = scram.as_ref();
 
@@ -133,8 +135,7 @@ impl ScramCommon
             }
         }
 
-        scram_error!(ScramErrorCode::ExternalError,
-                    "unknown scram type: {}", scram_name);
+        scram_error!(ScramErrorCode::ExternalError, "unknown scram type: {}", scram_name);
     }
 
     /// Retrieves the SCRAM type from [SCRAM_TYPES] by the numeric alias which 
@@ -149,14 +150,15 @@ impl ScramCommon
     /// 
     /// * [ScramResult] - a reference to record from table with static lifetime
     ///                     or Error [ScramErrorCode::ExternalError] if not found
-    pub fn get_scramtype_numeric(scram: ScramTypeAlias) -> ScramResult<&'static ScramType>
+    pub 
+    fn get_scramtype_numeric(scram: ScramTypeAlias) -> ScramResult<&'static ScramType>
     {
         let scram_offset = *(&scram) as usize;
+        
         match SCRAM_TYPES.get(scram_offset)
         {
             Some(r) => return Ok(r),
-            None => scram_error!(ScramErrorCode::ExternalError,
-                        "unknown scram type: {:?}", scram)
+            None => scram_error!(ScramErrorCode::ExternalError, "unknown scram type: {:?}", scram)
         }
     }
 }

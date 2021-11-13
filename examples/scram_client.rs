@@ -15,12 +15,12 @@ struct AuthClient
 
 impl ScramAuthClient for AuthClient
 {
-    fn get_username(&self) -> &String
+    fn get_username(&self) -> &str
     {
         return &self.username;
     }
 
-    fn get_password(&self) -> &String
+    fn get_password(&self) -> &str
     {
         return &self.password;
     }

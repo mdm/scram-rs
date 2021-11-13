@@ -1,8 +1,8 @@
 [package]
 name = "scram-rs"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["Aleksandr Morozov <alex@nixd.org>"]
-edition = "2018"
+edition = "2021"
 description="Salted Challenge Response Authentication Mechanism (SCRAM) SASL mechanism, a library which implements SCRAM logic"
 repository = "https://gitlab.com/relkom/scram-rs"
 keywords = ["SCRAM", "SASL"]

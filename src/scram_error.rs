@@ -48,7 +48,7 @@ impl fmt::Debug for ScramRuntimeError
     }
 }
 
-
+/// Error code
 pub enum ScramErrorCode
 {
     /// Error happened inside lib

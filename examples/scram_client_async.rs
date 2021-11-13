@@ -16,12 +16,12 @@ struct AuthClient
 #[async_trait]
 impl AsyncScramAuthClient for AuthClient
 {
-    async fn get_username(&self) -> &String
+    async fn get_username(&self) -> &str
     {
         return &self.username;
     }
 
-    async fn get_password(&self) -> &String
+    async fn get_password(&self) -> &str
     {
         return &self.password;
     }

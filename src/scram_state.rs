@@ -30,8 +30,7 @@ use std::fmt;
 /// Server receives data and sends response and sets: Complete
 /// 
 /// Client receives and sets its state to: Complete
-
-#[derive(PartialEq, Clone)]
+#[derive(Eq, PartialEq, Clone, Debug)]
 pub(crate) enum ScramState 
 {    
     /// Instance of client was created, but no comm yet initialized
@@ -71,7 +70,7 @@ impl fmt::Display for ScramState
     }
 }
 
-impl fmt::Debug for ScramState
+/*impl fmt::Debug for ScramState
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result 
     {
@@ -85,4 +84,4 @@ impl fmt::Debug for ScramState
             Self::Completed                 => write!(f, "Completed"),
         }
     }
-}
+}*/

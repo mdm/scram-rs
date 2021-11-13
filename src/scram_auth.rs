@@ -27,7 +27,7 @@ use super::scram_hashing::ScramHashing;
 /// A authentification callback returns this enum. 
 /// 
 /// The callback should use implemented functions to generate the result!
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ScramPassword
 {
     /// Default state for initialization!
@@ -58,23 +58,26 @@ pub enum ScramPassword
     }
 }
 
-impl ScramPassword
+impl Default for ScramPassword
 {
-    /// A default initialization. A program which utilizes this crate should 
-    /// never use this function.
-    pub fn default() -> Self
+    fn default() -> Self 
     {
         return Self::None;
     }
+}
 
+impl ScramPassword
+{
     /// Returns true if [ScramPassword] is diffrent than None
-    pub fn is_ok(&self) -> bool
+    pub 
+    fn is_ok(&self) -> bool
     {
-        match *self
+        return *self != Self::None;
+        /*match *self
         {
             Self::None => return false,
             _ => return true,
-        }
+        }*/
     }
 
     /// Internal function to generate mock salt.
@@ -93,7 +96,8 @@ impl ScramPassword
     /// # Throws
     /// 
     /// May throw an error.
-    pub fn not_found<S: ScramHashing>() -> ScramResult<Self>
+    pub 
+    fn not_found<S: ScramHashing>() -> ScramResult<Self>
     {
         // generate fake data
         let salt = ScramPassword::scram_mock_salt()?;
@@ -102,7 +106,8 @@ impl ScramPassword
 
         let salted_password = S::derive(&password_raw, &salt, ScramCommon::SCRAM_DEFAULT_SALT_ITER)?;
 
-        let ret = Self::UserNotFound
+        let ret = 
+            Self::UserNotFound
             {
                 salted_hashed_password: salted_password,
                 salt_b64: base64::encode(salt),
@@ -123,14 +128,17 @@ impl ScramPassword
     /// # Throws
     /// 
     /// May throw an error.
-    pub fn found_plaintext_password<S: ScramHashing>(pass: &[u8]) -> ScramResult<Self>
+    pub 
+    fn found_plaintext_password<S: ScramHashing>(pass: &[u8]) -> ScramResult<Self>
     {
         //generate salt and iterations
         let salt = ScramPassword::scram_mock_salt()?;
 
-        let salted_password = S::derive(pass, &salt, ScramCommon::SCRAM_DEFAULT_SALT_ITER)?;
+        let salted_password = 
+            S::derive(pass, &salt, ScramCommon::SCRAM_DEFAULT_SALT_ITER)?;
 
-        let ret = Self::UserPasswordData
+        let ret = 
+            Self::UserPasswordData
             {
                 salted_hashed_password: salted_password,
                 salt_b64: base64::encode(salt),
@@ -152,9 +160,11 @@ impl ScramPassword
     /// # Throws
     /// 
     /// May throw an error.
-    pub fn found_plaintext_password_with_iterations<S>(
-            pass: &[u8], 
-            iterations: u32) -> ScramResult<Self>
+    pub 
+    fn found_plaintext_password_with_iterations<S>(
+        pass: &[u8], 
+        iterations: u32
+    ) -> ScramResult<Self>
     where S: ScramHashing
     {
         //generate salt and iterations
@@ -162,7 +172,8 @@ impl ScramPassword
 
         let salted_password = S::derive(pass, &salt, iterations)?;
 
-        let ret = Self::UserPasswordData
+        let ret = 
+            Self::UserPasswordData
             {
                 salted_hashed_password: salted_password,
                 salt_b64: base64::encode(salt),
@@ -186,12 +197,15 @@ impl ScramPassword
     /// # Throws
     /// 
     /// May throw an error.
-    pub fn found_secret_password(
+    pub 
+    fn found_secret_password(
         salted_hashed_password: Vec<u8>, 
         salt_base64: String, 
-        iterations: u32) -> Self
+        iterations: u32
+    ) -> Self
     {
-        return Self::UserPasswordData
+        return 
+            Self::UserPasswordData
             {
                 salted_hashed_password: salted_hashed_password,
                 salt_b64: salt_base64,
@@ -218,10 +232,12 @@ impl ScramPassword
     /// # Returns
     /// 
     /// Instance of [ScramPassword::UserPasswordData] 
-    pub fn salt_password_with_params<U, S>(
+    pub 
+    fn salt_password_with_params<U, S>(
         pass_plain: U, 
         salt_plain: Option<Vec<u8>>, 
-        iter: Option<u32>) -> ScramResult<Self>
+        iter: Option<u32>
+    ) -> ScramResult<Self>
     where S: ScramHashing, U: AsRef<[u8]>
     {
         let salt = 
@@ -240,7 +256,8 @@ impl ScramPassword
 
         let salted_password = S::derive(pass_plain.as_ref(), &salt, iterations)?;
 
-        let ret = Self::UserPasswordData
+        let ret = 
+            Self::UserPasswordData
             {
                 salted_hashed_password: salted_password,
                 salt_b64: base64::encode(salt),
@@ -251,31 +268,32 @@ impl ScramPassword
     }
 
     /// Returns the reference to salt. Will panic! when misused.
-    #[allow(unused_variables)]
-    pub fn get_salt_base64(&self) -> &String
+    pub 
+    fn get_salt_base64(&self) -> &String
     {
         match *self
         {
             Self::None => panic!("misuse get_salt()"),
-            Self::UserNotFound{ref salted_hashed_password, ref salt_b64, ref iterations} => return salt_b64,
-            Self::UserPasswordData{ref salted_hashed_password, ref salt_b64, ref iterations} => return salt_b64,
+            Self::UserNotFound{ ref salt_b64, .. } => return salt_b64,
+            Self::UserPasswordData{ ref salt_b64, .. } => return salt_b64,
         }
     }
 
     /// Returns the iteration count. Will panic! when misused.
-    #[allow(unused_variables)]
-    pub fn get_iterations(&self) -> u32
+    pub 
+    fn get_iterations(&self) -> u32
     {
         match *self
         {
             Self::None => panic!("misuse get_iterations()"),
-            Self::UserNotFound{ref salted_hashed_password, ref salt_b64, ref iterations} => return *iterations,
-            Self::UserPasswordData{ref salted_hashed_password, ref salt_b64, ref iterations} => return *iterations,
+            Self::UserNotFound{ ref iterations, .. } => return *iterations,
+            Self::UserPasswordData{ ref iterations, .. } => return *iterations,
         }
     }
 
     /// Returns the salted and hashed password. Will panic! when misused.
-    pub fn get_salted_hashed_password(&self) -> &[u8]
+    pub 
+    fn get_salted_hashed_password(&self) -> &[u8]
     {
         match *self
         {
@@ -379,12 +397,12 @@ pub trait AsyncScramAuthServer<S: ScramHashing>
 /// ```
 /// impl ScramAuthClient for <ProgramStruct>
 /// {
-///     fn get_username(&self) -> &String
+///     fn get_username(&self) -> &str
 ///     {
 ///         return &self.username;
 ///     }
 /// 
-///     fn get_password(&self) -> &String
+///     fn get_password(&self) -> &str
 ///     {
 ///         return &self.password;
 ///     }
@@ -392,8 +410,10 @@ pub trait AsyncScramAuthServer<S: ScramHashing>
 /// ```
 pub trait ScramAuthClient
 {
-    fn get_username(&self) -> &String;
-    fn get_password(&self) -> &String;
+    /// This function must return plain text username
+    fn get_username(&self) -> &str;
+    /// This function must return plain text password
+    fn get_password(&self) -> &str;
 }
 
 
@@ -408,12 +428,12 @@ pub trait ScramAuthClient
 /// #[async_trait]
 /// impl AsyncScramAuthClient for <ProgramStruct>
 /// {
-///     async fn get_username(&self) -> &String
+///     async fn get_username(&self) -> &str
 ///     {
 ///         return &self.username;
 ///     }
 /// 
-///     async fn get_password(&self) -> &String
+///     async fn get_password(&self) -> &str
 ///     {
 ///         return &self.password;
 ///     }
@@ -422,8 +442,10 @@ pub trait ScramAuthClient
 #[async_trait]
 pub trait AsyncScramAuthClient
 {
-    async fn get_username(&self) -> &String;
-    async fn get_password(&self) -> &String;
+    /// This function must return plain text username
+    async fn get_username(&self) -> &str;
+    /// This function must return plain text password
+    async fn get_password(&self) -> &str;
 }
 
 #[test]
@@ -477,4 +499,12 @@ fn test_password_gen()
     assert_eq!(res.get_salted_hashed_password(), base64::decode("afBEmfdaTuiwYy1yoCIQ8XJJ1Awzo3Ha5Mf2aLTRHhs=").unwrap());
 
     return;
+}
+
+#[test]
+fn test_if()
+{
+    let res = ScramPassword::default();
+
+    assert_eq!(res.is_ok(), false);
 }

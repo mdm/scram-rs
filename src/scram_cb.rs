@@ -52,20 +52,23 @@ impl fmt::Display for ServerChannelBindType
 impl ServerChannelBindType
 {
     /// Initializes enum as n,,
-    pub fn n() -> Self
+    pub 
+    fn n() -> Self
     {
         return Self::None;
     }
 
     /// Initializes enum as y,,
-    pub fn y() -> Self
+    pub 
+    fn y() -> Self
     {
         return Self::Unsupported;
     }
 
     /// Initializes enum as p=tls-server-end-point
     #[allow(dead_code)]
-    pub fn tls_server_endpoint() -> Self
+    pub 
+    fn tls_server_endpoint() -> Self
     {
         return Self::TlsServerEndpoint;
     }
@@ -81,7 +84,8 @@ impl ServerChannelBindType
     /// # Returns
     /// 
     /// * [ScramResult] - returns nothing in payload or error
-    pub fn server_initial_verify_client_cb(&self, st: &ScramType) -> ScramResult<()>
+    pub 
+    fn server_initial_verify_client_cb(&self, st: &ScramType) -> ScramResult<()>
     {
         if st.scram_chan_bind == true
         {
@@ -89,18 +93,26 @@ impl ServerChannelBindType
             match *self
             {
                 Self::TlsUnique => 
-                    scram_error!(ScramErrorCode::MalformedScramMsg,
-                                "unsupported SCRAM channel-binding type {}!", self),
+                    scram_error!(
+                        ScramErrorCode::MalformedScramMsg,
+                        "unsupported SCRAM channel-binding type {}!", 
+                        self
+                    ),
 
                 Self::TlsServerEndpoint{..} => return Ok(()),
 
                 Self::None => 
-                    scram_error!(ScramErrorCode::MalformedScramMsg,
-                                "malformed message, client selected *-PLUS but message does not include cb data!"),
+                    scram_error!(
+                        ScramErrorCode::MalformedScramMsg,
+                        "malformed message, client selected *-PLUS but message does not include cb data!"
+                    ),
+
                 //if client pickes -PLUS and sends y(Unsupported) then this is malformed message
                 Self::Unsupported => 
-                    scram_error!(ScramErrorCode::MalformedScramMsg,
-                                "malformed message, client picked -PLUS, but did not provide cb data"),
+                    scram_error!(
+                        ScramErrorCode::MalformedScramMsg,
+                        "malformed message, client picked -PLUS, but did not provide cb data"
+                    ),
             }
         }
         else
@@ -109,9 +121,13 @@ impl ServerChannelBindType
             match *self
             {
                 Self::TlsUnique | Self::TlsServerEndpoint{..} => 
-                    scram_error!(ScramErrorCode::MalformedScramMsg,
-                                "client provided channel binding data while picking SCRAM without -PLUS extension!"),
+                    scram_error!(
+                        ScramErrorCode::MalformedScramMsg,
+                        "client provided channel binding data while picking SCRAM without -PLUS extension!"
+                    ),
+
                 Self::None => return Ok(()),
+
                 // client picks SCRAM-? and thinks we don't support channel binding
                 Self::Unsupported => return Ok(()),
             }
@@ -132,10 +148,13 @@ impl ServerChannelBindType
     /// # Returns
     /// 
     /// * [ScramResult] nothing in payload or error
-    pub fn server_final_verify_client_cb(&mut self, 
-                                        st: &ScramType, 
-                                        cb_attr: &str,
-                                        endpoint_hash: Option<&std::vec::Vec<u8>>) -> ScramResult<()>
+    pub 
+    fn server_final_verify_client_cb(
+        &mut self, 
+        st: &ScramType, 
+        cb_attr: &str,
+        endpoint_hash: Option<&std::vec::Vec<u8>>
+    ) -> ScramResult<()>
     {
         // verify input
         // If we are not using channel binding, the binding data is expected
@@ -148,8 +167,7 @@ impl ServerChannelBindType
             Self::TlsUnique =>
             {
                 panic!("assertion trap: Tls-uniq is not supported, cb_type: {}, \
-                         scram_type: {}",
-                        self, st)
+                         scram_type: {}", self, st)
             },
             Self::TlsServerEndpoint =>
             {
@@ -161,12 +179,15 @@ impl ServerChannelBindType
                             self, st);
                 }
 
-                let endp_cert_hash = match endpoint_hash
+                let endp_cert_hash = 
+                    match endpoint_hash
                     {
                         Some(r) => r,   
-                        None => panic!("assertion trap: cb_type: {}, scram_type: {} \
-                                        TlsServerEndpoint requires endpoint_hash to be Some(...)", 
-                                        self, st)
+                        None => 
+                            panic!(
+                                "assertion trap: cb_type: {}, scram_type: {} \
+                                TlsServerEndpoint requires endpoint_hash to be Some(...)", 
+                                self, st)
                     };
                 //get the data from ChannelBindingData which contains 
                 //hash data of server's SSL certificate and combine it
@@ -185,8 +206,7 @@ impl ServerChannelBindType
                 }
                 else
                 {
-                    scram_error!(ScramErrorCode::VerificationError,
-                                "SCRAM channel binding check failed");
+                    scram_error!(ScramErrorCode::VerificationError, "SCRAM channel binding check failed");
                 }
             },
             Self::Unsupported => 
@@ -197,8 +217,11 @@ impl ServerChannelBindType
                 }
                 else
                 {
-                    scram_error!(ScramErrorCode::ProtocolViolation,
-                                "unexpected SCRAM channel-binding attribute in client-final-message: {}", cb_attr);
+                    scram_error!(
+                        ScramErrorCode::ProtocolViolation,
+                        "unexpected SCRAM channel-binding attribute in client-final-message: {}", 
+                        cb_attr
+                    );
                 }
             },
             Self::None =>
@@ -209,15 +232,19 @@ impl ServerChannelBindType
                 }
                 else
                 {
-                    scram_error!(ScramErrorCode::ProtocolViolation,
-                                "unexpected SCRAM channel-binding attribute in client-final-message: {}", cb_attr);
+                    scram_error!(
+                        ScramErrorCode::ProtocolViolation,
+                        "unexpected SCRAM channel-binding attribute in client-final-message: {}", 
+                        cb_attr
+                    );
                 }
             }
         }
     }
 
     /// Converts channel binding type directly from string, for server side use only
-    pub fn from_str<C: AsRef<str>>(cb: C) -> ScramResult<Self>
+    pub 
+    fn from_str<C: AsRef<str>>(cb: C) -> ScramResult<Self>
     {
         match cb.as_ref()
         {
@@ -225,13 +252,13 @@ impl ServerChannelBindType
             "unsupported" => return Ok(Self::Unsupported),
             "tls-unique" => return Ok(Self::TlsUnique),
             "tls-server-end-point" => return Ok(Self::TlsServerEndpoint),
-            _ => scram_error!(ScramErrorCode::ProtocolViolation,
-                            "Unknown channel bind type: '{}'", cb.as_ref()),
+            _ => scram_error!(ScramErrorCode::ProtocolViolation, "Unknown channel bind type: '{}'", cb.as_ref()),
         }
     }
 
     #[allow(dead_code)]
-    pub fn convert2header(&self) -> &[u8]
+    pub 
+    fn convert2header(&self) -> &[u8]
     {
         match self
         {
@@ -273,19 +300,22 @@ impl fmt::Display for ClientChannelBindingType
 impl ClientChannelBindingType
 {
     /// Initializes enum as No channel binding is required
-    pub fn without_chan_binding() -> Self
+    pub 
+    fn without_chan_binding() -> Self
     {
         return Self::None;
     }
 
     /// Initializes enum as Client picks -PLUS and provides the endpoint cert hash
-    pub fn with_tls_server_endpoint(cb_data: Vec<u8>) -> Self
+    pub 
+    fn with_tls_server_endpoint(cb_data: Vec<u8>) -> Self
     {
         return Self::TlsServerEndpoint{cb_data: cb_data};
     }
 
     /// Converts the [ClientChannelBindingType] to protocol header text 
-    pub fn convert2header(&self) -> &[u8]
+    pub 
+    fn convert2header(&self) -> &[u8]
     {
         match self
         {
@@ -297,7 +327,8 @@ impl ClientChannelBindingType
     }
 
     // Extracts from the [ClientChannelBindingType] the stored data
-    pub fn convert2data(&self) -> &[u8]
+    pub 
+    fn convert2data(&self) -> &[u8]
     {
         match *self
         {

@@ -68,7 +68,8 @@ pub struct SyncScramServer<'ss, S: ScramHashing, A: ScramAuthServer<S>>
 impl<'ss, S: ScramHashing, A: ScramAuthServer<S>> SyncScramServer<'ss, S, A>
 {
     /// Returns the supported types in format SCRAM SCRAM SCRAM
-    pub fn advertise_types() -> String
+    pub 
+    fn advertise_types() -> String
     {
         return ScramCommon::adrvertise(" ");
     }
@@ -94,19 +95,24 @@ impl<'ss, S: ScramHashing, A: ScramAuthServer<S>> SyncScramServer<'ss, S, A>
     /// let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
     /// let scram_res = ScramServer::<ScramSha256, AuthServer>::new(&serv, None, nonce, scramtype);
     /// ```
-    pub fn new(scram_auth_serv: &'ss A,
-                data_chanbind: Option<Vec<u8>>, 
-                scram_nonce: ScramNonce, 
-                st: &'ss ScramType) -> ScramResult<SyncScramServer<'ss, S, A>>
+    pub 
+    fn new(scram_auth_serv: &'ss A,
+        data_chanbind: Option<Vec<u8>>, 
+        scram_nonce: ScramNonce, 
+        st: &'ss ScramType
+    ) -> ScramResult<SyncScramServer<'ss, S, A>>
     {
         if st.scram_chan_bind == true && data_chanbind.is_none() == true
         {
-            scram_error!(ScramErrorCode::ExternalError,
-                        "scram: '{}' requires the data_chanbind to be set",
-                        st);
+            scram_error!(
+                ScramErrorCode::ExternalError,
+                "scram: '{}' requires the data_chanbind to be set",
+                st
+            );
         }
 
-        let res = Self
+        let res = 
+            Self
             {
                 hasher: PhantomData,
                 auth: scram_auth_serv,
@@ -131,16 +137,26 @@ impl<'ss, S: ScramHashing, A: ScramAuthServer<S>> SyncScramServer<'ss, S, A>
     /// # Returns
     /// 
     /// * ScramResult<[ScramParse]> the response will be encoded to UTF-8
-    pub fn parse_response_base64<T: AsRef<[u8]>>(&mut self, input: T) -> ScramResult<ScramParse>
+    pub 
+    fn parse_response_base64<T: AsRef<[u8]>>(&mut self, input: T) -> ScramResult<ScramParse>
     {
-        let decoded = base64::decode(input)
-                            .map_err(|e| scram_error_map!(ScramErrorCode::MalformedScramMsg, 
-                                                        "base64 decode client response failed, '{}'", e))?;
+        let decoded = 
+            base64::decode(input)
+                .map_err(|e| 
+                    scram_error_map!(
+                        ScramErrorCode::MalformedScramMsg, 
+                        "base64 decode client response failed, '{}'", e
+                    )
+                )?;
 
         let dec_utf8 = 
             str::from_utf8(&decoded)
-                .map_err(|e| scram_error_map!(ScramErrorCode::MalformedScramMsg, 
-                                            "base64 decoded response contains invalid UTF-8 seq, '{}'", e))?;
+                .map_err(|e| 
+                    scram_error_map!(
+                        ScramErrorCode::MalformedScramMsg, 
+                        "base64 decoded response contains invalid UTF-8 seq, '{}'", e
+                    )
+                )?;
 
         return self.parse_response(dec_utf8, true);
     }
@@ -158,7 +174,8 @@ impl<'ss, S: ScramHashing, A: ScramAuthServer<S>> SyncScramServer<'ss, S, A>
     /// 
     /// * ScramResult<[ScramParse]> the response will be encoded to UTF-8 depending on
     /// argument `to_base`
-    pub fn parse_response(&mut self, resp: &str, to_base: bool) -> ScramResult<ScramParse>
+    pub 
+    fn parse_response(&mut self, resp: &str, to_base: bool) -> ScramResult<ScramParse>
     {
         let parsed_resp = ScramDataParser::from_raw(resp, &self.state)?;
 
@@ -214,17 +231,20 @@ impl<'ss, S: ScramHashing, A: ScramAuthServer<S>> SyncScramServer<'ss, S, A>
             {
                 // verify channel bind
                 self.cli_chanbind.server_final_verify_client_cb(
-                        self.st, 
-                        chanbinding,
-                        self.data_chanbind.as_ref())?;
+                    self.st, 
+                    chanbinding,
+                    self.data_chanbind.as_ref()
+                )?;
 
                 let nonce = [client_nonce.as_str(), self.server_nonce.as_str()].concat();
 
                 // verify nonce
                 if finalnonce != nonce.as_str()
                 {
-                    scram_error!(ScramErrorCode::VerificationError,
-                                "received invalid nonce rcvn: {} have: {}", finalnonce, client_nonce);
+                    scram_error!(
+                        ScramErrorCode::VerificationError,
+                        "received invalid nonce rcvn: {} have: {}", finalnonce, client_nonce
+                    );
                 }
 
                 /*let cb_data = base64::encode(
@@ -238,11 +258,11 @@ impl<'ss, S: ScramHashing, A: ScramAuthServer<S>> SyncScramServer<'ss, S, A>
                 let client_final_without_proof = ["c=", chanbinding, ",r=", &nonce].concat();
                 let client_first_bare = ["n=", self.username.as_ref().unwrap(), ",r=", client_nonce].concat();
                 let server_first = 
-                            [
-                                "r=", &nonce, 
-                                ",s=", self.sp.get_salt_base64(),
-                                ",i=", &self.sp.get_iterations().to_string(),
-                            ].concat();
+                    [
+                        "r=", &nonce, 
+                        ",s=", self.sp.get_salt_base64(),
+                        ",i=", &self.sp.get_iterations().to_string(),
+                    ].concat();
 
                 let authmsg = 
                     [
@@ -264,19 +284,20 @@ impl<'ss, S: ScramHashing, A: ScramAuthServer<S>> SyncScramServer<'ss, S, A>
 
                 // verify proof
                 let recv_decoded_proof = 
-                                base64::decode(proof)
-                                        .map_err(|e| scram_error_map!(ScramErrorCode::MalformedScramMsg, 
-                                                                     "base64 decode client proof failed, {}", e))?;
+                    base64::decode(proof)
+                        .map_err(|e| 
+                            scram_error_map!(
+                                ScramErrorCode::MalformedScramMsg, 
+                                "base64 decode client proof failed, {}", e
+                            )
+                        )?;
+
                 if calc_client_proof != recv_decoded_proof
                 {
-                    scram_error!(ScramErrorCode::VerificationError,
-                                "received invalid proof from client");
+                    scram_error!(ScramErrorCode::VerificationError, "received invalid proof from client");
                 }
 
-                let output = 
-                    [
-                        "v=", &base64::encode(&server_signature),
-                    ].concat();
+                let output = ["v=", &base64::encode(&server_signature)].concat();
 
                 // update states
                 self.state = ScramState::Completed;
@@ -346,24 +367,28 @@ impl<'sc, S: ScramHashing, A: ScramAuthClient> SyncScramClient<'sc, S, A>
     ///
     /// let scram_res = SyncScramClient::<ScramSha256, AuthClient>::new(&ac, nonce, cbt);
     /// ```
-    pub fn new(scram_auth_cli: &'sc A, 
-                scram_nonce: ScramNonce, 
-                chan_bind_type: ClientChannelBindingType) -> ScramResult<SyncScramClient<'sc, S, A>>
+    pub 
+    fn new(
+        scram_auth_cli: &'sc A, 
+        scram_nonce: ScramNonce, 
+        chan_bind_type: ClientChannelBindingType
+    ) -> ScramResult<SyncScramClient<'sc, S, A>>
     {
         return Ok(
-                    Self
-                        {
-                            hasher: PhantomData,
-                            auth: scram_auth_cli,
-                            client_nonce: scram_nonce.get_nonce()?,
-                            state: ScramState::InitClient,
-                            chanbind: chan_bind_type,
-                        }
-                );
+            Self
+            {
+                hasher: PhantomData,
+                auth: scram_auth_cli,
+                client_nonce: scram_nonce.get_nonce()?,
+                state: ScramState::InitClient,
+                chanbind: chan_bind_type,
+            }
+        );
     }
 
     /// Checks if the client authentification was completed successfully.
-    pub fn is_completed(&self) -> bool
+    pub 
+    fn is_completed(&self) -> bool
     {
         match self.state
         {
@@ -381,11 +406,15 @@ impl<'sc, S: ScramHashing, A: ScramAuthClient> SyncScramClient<'sc, S, A>
     /// 
     /// # Returns
     /// * base64 encoded or plain string with formed message
-    pub fn init_client(&mut self, to_base64: bool) -> String
+    pub 
+    fn init_client(&mut self, to_base64: bool) -> String
     {            
-        let compiled = [self.chanbind.convert2header(),
-                        b"n=", self.auth.get_username().as_bytes(),
-                        b",r=", &self.client_nonce.as_bytes()].concat();
+        let compiled = 
+            [
+                self.chanbind.convert2header(),
+                b"n=", self.auth.get_username().as_bytes(),
+                b",r=", &self.client_nonce.as_bytes()
+            ].concat();
         
         self.state = ScramState::WaitForServInitMsg;     
         
@@ -395,7 +424,7 @@ impl<'sc, S: ScramHashing, A: ScramAuthClient> SyncScramClient<'sc, S, A>
         }
         else
         {
-            return unsafe {String::from_utf8_unchecked(compiled)};
+            return unsafe { String::from_utf8_unchecked(compiled) };
         }
     }
 
@@ -409,16 +438,26 @@ impl<'sc, S: ScramHashing, A: ScramAuthClient> SyncScramClient<'sc, S, A>
     /// # Returns
     /// 
     /// * ScramResult<[ScramParse]> the response will be encoded to UTF-8 
-    pub fn parse_response_base64<T: AsRef<[u8]>>(&mut self, input: T) -> ScramResult<ScramParse>
+    pub 
+    fn parse_response_base64<T: AsRef<[u8]>>(&mut self, input: T) -> ScramResult<ScramParse>
     {
-        let decoded = base64::decode(input)
-                            .map_err(|e| scram_error_map!(ScramErrorCode::MalformedScramMsg, 
-                                                        "base64 decode server response failed, '{}'", e))?;
+        let decoded = 
+            base64::decode(input)
+                .map_err(|e| 
+                    scram_error_map!(
+                        ScramErrorCode::MalformedScramMsg, 
+                        "base64 decode server response failed, '{}'", e
+                    )
+                )?;
 
         let dec_utf8 = 
             str::from_utf8(&decoded)
-                .map_err(|e| scram_error_map!(ScramErrorCode::MalformedScramMsg, 
-                                            "base64 decoded response contains invalid UTF-8 seq, '{}'", e))?;
+                .map_err(|e| 
+                    scram_error_map!(
+                        ScramErrorCode::MalformedScramMsg, 
+                        "base64 decoded response contains invalid UTF-8 seq, '{}'", e
+                    )
+                )?;
 
         return self.parse_response(dec_utf8, true);
     }
@@ -436,7 +475,8 @@ impl<'sc, S: ScramHashing, A: ScramAuthClient> SyncScramClient<'sc, S, A>
     /// 
     /// * ScramResult<[ScramParse]> the response will be encoded to UTF-8 depending on
     /// argument `to_base64`
-    pub fn parse_response(&mut self, resp: &str, to_base64: bool) -> ScramResult<ScramParse>
+    pub 
+    fn parse_response(&mut self, resp: &str, to_base64: bool) -> ScramResult<ScramParse>
     {
         let parsed_resp = ScramDataParser::from_raw(&resp, &self.state)?;
 
@@ -452,28 +492,34 @@ impl<'sc, S: ScramHashing, A: ScramAuthClient> SyncScramClient<'sc, S, A>
                 //validate iterations
                 if itrcnt == 0 || itrcnt > 999999999
                 {
-                    scram_error!(ScramErrorCode::InternalError, 
-                                "iterations count is not appropriate: i='{}'", itrcnt);
+                    scram_error!(
+                        ScramErrorCode::InternalError, 
+                        "iterations count is not appropriate: i='{}'", 
+                        itrcnt
+                    );
                 }
 
                 //todo channel bind things SASL 
-                let cb_data = base64::encode(
-                                [
-                                    self.chanbind.convert2header(), 
-                                    self.chanbind.convert2data()
-                                ].concat());
+                let cb_data = 
+                    base64::encode(
+                        [
+                            self.chanbind.convert2header(), 
+                            self.chanbind.convert2data()
+                        ].concat()
+                    );
 
                 let client_final_message_bare = ["c=", &cb_data, ",r=", nonce].concat();
 
                 let authmsg = 
-                            [
-                                b"n=", self.auth.get_username().as_bytes(),
-                                b",r=", self.client_nonce.as_bytes(), 
-                                b",", resp.as_bytes(),
-                                b",", client_final_message_bare.as_bytes()
-                            ].concat();
+                    [
+                        b"n=", self.auth.get_username().as_bytes(),
+                        b",r=", self.client_nonce.as_bytes(), 
+                        b",", resp.as_bytes(),
+                        b",", client_final_message_bare.as_bytes()
+                    ].concat();
 
-                let salted_password = S::derive(self.auth.get_password().as_bytes(), &salt, itrcnt)?;
+                let salted_password = 
+                    S::derive(self.auth.get_password().as_bytes(), &salt, itrcnt)?;
                 let client_key = S::hmac(b"Client Key", &salted_password)?;
                 let server_key = S::hmac(b"Server Key", &salted_password)?;
 
@@ -483,11 +529,12 @@ impl<'sc, S: ScramHashing, A: ScramAuthClient> SyncScramClient<'sc, S, A>
                 let client_signature = S::hmac(&authmsg, &stored_key)?;
                 let server_signature = S::hmac(&authmsg, &server_key)?;
                 
-                let client_response = [
-                                        &client_final_message_bare,
-                                        ",p=",
-                                        &base64::encode(ScramDataParser::xor_arrays(&client_key, &client_signature)?)
-                                    ].concat();
+                let client_response = 
+                    [
+                        &client_final_message_bare,
+                        ",p=",
+                        &base64::encode(ScramDataParser::xor_arrays(&client_key, &client_signature)?)
+                    ].concat();
                 
 
                 self.state = ScramState::WaitForServFinalMsg{server_signature: server_signature};
@@ -516,10 +563,11 @@ impl<'sc, S: ScramHashing, A: ScramAuthClient> SyncScramClient<'sc, S, A>
                 }
                 else
                 {
-                    scram_error!(ScramErrorCode::VerificationError,
-                                "state: '{}', server signature mismatch, \
-                                server sig: '{:x?}', local: {:x?}",
-                                self.state, server_verifier, verifier);
+                    scram_error!(
+                        ScramErrorCode::VerificationError,
+                        "state: '{}', server signature mismatch, server sig: '{:x?}', local: {:x?}",
+                        self.state, server_verifier, verifier
+                    );
                 }
 
             }
@@ -626,12 +674,12 @@ fn scram_sha256_works()
 
     impl ScramAuthClient for AuthClient
     {
-        fn get_username(&self) -> &String
+        fn get_username(&self) -> &str
         {
             return &self.username;
         }
 
-        fn get_password(&self) -> &String
+        fn get_password(&self) -> &str
         {
             return &self.password;
         }
