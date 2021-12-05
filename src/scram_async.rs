@@ -17,6 +17,7 @@
 * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
+use std::num::NonZeroU32;
 use std::str;
 use std::marker::PhantomData;
 
@@ -530,7 +531,7 @@ impl<'sc, S: ScramHashing, A: AsyncScramAuthClient> AsyncScramClient<'sc, S, A>
                     ].concat();
 
                 let salted_password = 
-                    S::derive(self.auth.get_password().await.as_bytes(), &salt, itrcnt)?;
+                    S::derive(self.auth.get_password().await.as_bytes(), &salt, NonZeroU32::new(itrcnt).unwrap())?;
 
                 let client_key = S::hmac(b"Client Key", &salted_password)?;
                 let server_key = S::hmac(b"Server Key", &salted_password)?;
@@ -610,11 +611,16 @@ fn scram_sha256_server()
         {
             let password = "pencil";
             let salt = b"[m\x99h\x9d\x125\x8e\xec\xa0K\x14\x126\xfa\x81".to_vec();
+            let iterations = NonZeroU32::new(4096).unwrap();
 
-            Ok(ScramPassword::found_secret_password(
-                    ScramSha256::derive(password.as_bytes(), &salt, 4096).unwrap(),
-                    base64::encode(salt), 
-                    4096))
+            return 
+                Ok(
+                    ScramPassword::found_secret_password(
+                        ScramSha256::derive(password.as_bytes(), &salt, iterations).unwrap(),
+                        base64::encode(salt), 
+                        iterations
+                    )
+                );
 
                     
         }

@@ -17,6 +17,7 @@
 * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 use std::fmt;
+use std::num::NonZeroU32;
 
 use getrandom::getrandom;
 
@@ -75,7 +76,7 @@ impl ScramCommon
     pub const MOCK_AUTH_NONCE_LEN: usize = 16;
 
     /// Default HMAC iterations
-    pub const SCRAM_DEFAULT_SALT_ITER: u32 = 4096;
+    pub const SCRAM_DEFAULT_SALT_ITER: NonZeroU32 = unsafe { NonZeroU32::new_unchecked(4096) };
 
     /// Generates random secuence of bytes
     /// 

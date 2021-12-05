@@ -17,6 +17,8 @@
 * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
+use std::num::NonZeroU32;
+
 use async_trait::async_trait;
 
 use super::scram_error::{ScramResult};
@@ -43,7 +45,7 @@ pub enum ScramPassword
         /// plaintext salt used (non base64)
         salt_b64: String,
         /// iteration count
-        iterations: u32,
+        iterations: NonZeroU32,
     },
 
     /// User was found with or without salt data
@@ -54,7 +56,7 @@ pub enum ScramPassword
         /// plaintext salt used (non base64)
         salt_b64: String,
         /// iteration count
-        iterations: u32,
+        iterations: NonZeroU32,
     }
 }
 
@@ -163,7 +165,7 @@ impl ScramPassword
     pub 
     fn found_plaintext_password_with_iterations<S>(
         pass: &[u8], 
-        iterations: u32
+        iterations: NonZeroU32
     ) -> ScramResult<Self>
     where S: ScramHashing
     {
@@ -201,7 +203,7 @@ impl ScramPassword
     fn found_secret_password(
         salted_hashed_password: Vec<u8>, 
         salt_base64: String, 
-        iterations: u32
+        iterations: NonZeroU32
     ) -> Self
     {
         return 
@@ -236,7 +238,7 @@ impl ScramPassword
     fn salt_password_with_params<U, S>(
         pass_plain: U, 
         salt_plain: Option<Vec<u8>>, 
-        iter: Option<u32>
+        iter: Option<NonZeroU32>
     ) -> ScramResult<Self>
     where S: ScramHashing, U: AsRef<[u8]>
     {
@@ -281,7 +283,7 @@ impl ScramPassword
 
     /// Returns the iteration count. Will panic! when misused.
     pub 
-    fn get_iterations(&self) -> u32
+    fn get_iterations(&self) -> NonZeroU32
     {
         match *self
         {
@@ -484,7 +486,7 @@ fn test_password_gen()
         ScramPassword::salt_password_with_params::<_, ScramSha256>(
             "pencil".to_string().into_bytes(), 
             Some("test".to_string().into_bytes()), 
-            Some(4096)
+            Some(NonZeroU32::new(4096).unwrap())
         );
 
     let el = start.elapsed();
@@ -494,7 +496,7 @@ fn test_password_gen()
 
     let res = res.unwrap();
 
-    assert_eq!(res.get_iterations(), 4096);
+    assert_eq!(res.get_iterations().get(), 4096);
     assert_eq!(res.get_salt_base64().as_str(), "dGVzdA==");
     assert_eq!(res.get_salted_hashed_password(), base64::decode("afBEmfdaTuiwYy1yoCIQ8XJJ1Awzo3Ha5Mf2aLTRHhs=").unwrap());
 

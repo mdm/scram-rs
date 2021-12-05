@@ -1,6 +1,8 @@
 
 
 
+use std::num::NonZeroU32;
+
 use scram_rs::ScramHashing;
 use scram_rs::ScramResult;
 use scram_rs::ScramSha256;
@@ -28,11 +30,12 @@ impl ScramAuthServer<ScramSha256> for AuthDB
     {
         let password = "pencil";
         let salt = b"[m\x99h\x9d\x125\x8e\xec\xa0K\x14\x126\xfa\x81".to_vec();
+        let iter = NonZeroU32::new(4096).unwrap();
 
         Ok(ScramPassword::found_secret_password(
-                ScramSha256::derive(password.as_bytes(), &salt, 4096).unwrap(),
+                ScramSha256::derive(password.as_bytes(), &salt, iter).unwrap(),
                 base64::encode(salt), 
-                4096))
+                iter))
 
                 
     }

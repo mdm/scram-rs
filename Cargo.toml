@@ -1,6 +1,6 @@
 [package]
 name = "scram-rs"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Aleksandr Morozov <alex@nixd.org>"]
 edition = "2021"
 description="Salted Challenge Response Authentication Mechanism (SCRAM) SASL mechanism, a library which implements SCRAM logic"
@@ -17,6 +17,11 @@ opt-level = 3
 overflow-checks = true
 lto = true
 
+[features]
+default = ["use_default"]
+use_default = []
+use_ring = []
+
 [dependencies]
 
 #non GPL
@@ -27,6 +32,8 @@ sha-1 = "0.9"
 sha2 = "0.9"
 hmac = "0.11"
 pbkdf2 = "0.9"
+
+ring = "0.16"
 
 async-trait = "0.1"
 

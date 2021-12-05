@@ -24,6 +24,33 @@
 //! - SHA256 
 //! - SHA512 
 //! - -PLUS
+//!
+//! Features:
+//! - `use_default` - uses crates: [pbkdf2], [hmac], [sha2], [sha1] as a common hasing libs
+//! - `use_ring` - uses crates: [ring] as a common hashing lib
+//!
+//! For default crypto crates:
+//! scram-rs = { version = "0.4", default-features = true}
+//! 
+//! For `ring` crypto crates:
+//! scram-rs = { version = "0.4", default-features = false, features = ["use_ring"]}
+//! 
+//! ### scram_sha256_server() sync/async tests (DEBUG)
+//! 
+//! | iteration | use_default | use_ring |
+//! |-----------|-------------|----------|
+//! | 1         | 152.30ms    | 16.96ms  |
+//! | 2         | 143.78ms    | 16.52ms  |
+//! | 3         | 144.70ms    | 16.04ms  |
+//! 
+//! 
+//! ### scram_sha256_works() async tests (DEBUG)
+//! 
+//! | iteration | use_default | use_ring |
+//! |-----------|-------------|----------|
+//! | 1         | 143.68ms    | 16.15ms  |
+//! | 2         | 143.66ms    | 15.98ms  |
+//! | 3         | 144.40ms    | 17.12ms  |
 //! 
 //! For usage see ./examples/
 //! 
@@ -42,11 +69,22 @@
 extern crate async_trait;
 extern crate getrandom;
 extern crate base64;
+#[cfg(feature = "use_default")]
 extern crate pbkdf2;
+#[cfg(feature = "use_default")]
 extern crate hmac;
+#[cfg(feature = "use_default")]
 extern crate sha2;
+#[cfg(feature = "use_default")]
 extern crate sha1;
+
 extern crate md5;
+
+#[cfg(feature = "use_ring")]
+extern crate ring;
+
+#[cfg(all(feature = "use_default", feature = "use_ring"))]
+compile_error!("both features: use_default and use_ring can not be used simultaniosly!");
 
 pub mod scram;
 pub mod scram_cb;
