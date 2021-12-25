@@ -24,7 +24,7 @@ use sha1::{Sha1, Digest as Digest1};
 #[cfg(feature = "use_default")]
 use sha2::{Sha256, Sha512};
 #[cfg(feature = "use_default")]
-use hmac::{Hmac, Mac, NewMac};
+use hmac::{Hmac, Mac};
 #[cfg(feature = "use_default")]
 use pbkdf2::pbkdf2;
 
