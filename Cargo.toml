@@ -1,13 +1,18 @@
 [package]
 name = "scram-rs"
-version = "0.4.1"
+version = "0.4.2"
 authors = ["Aleksandr Morozov <alex@nixd.org>"]
 edition = "2021"
 description="Salted Challenge Response Authentication Mechanism (SCRAM) SASL mechanism, a library which implements SCRAM logic"
 repository = "https://gitlab.com/relkom/scram-rs"
 keywords = ["SCRAM", "SASL"]
 categories = ["authentication", "network-programming"]
-license="LGPL-3.0-or-later"
+license="MPL-2.0"
+
+# Since v 0.4.2 this project is relicensed with MPLv2.0.
+# The contributors and authors agreed to change license:
+# Aleksandr Morozov
+# RELKOM s.r.o
 
 [profile.dev]
 opt-level = 0
