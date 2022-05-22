@@ -22,7 +22,7 @@ use pbkdf2::pbkdf2;
 #[cfg(feature = "use_ring")]
 use ring::{digest as ring_digest, hmac as ring_hmac, rand, pbkdf2 as ring_pbkdf2};
 
-use super::scram_error::{ScramResult, ScramRuntimeError, ScramErrorCode};
+use super::scram_error::{ScramResult, ScramErrorCode};
 use super::{scram_error_map};
 
 

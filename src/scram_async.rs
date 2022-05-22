@@ -12,7 +12,7 @@ use std::num::NonZeroU32;
 use std::str;
 use std::marker::PhantomData;
 
-use super::scram_error::{ScramResult, ScramRuntimeError, ScramErrorCode};
+use super::scram_error::{ScramResult, ScramErrorCode};
 use super::{scram_error, scram_error_map};
 use super::scram_cb::{ServerChannelBindType, ClientChannelBindingType};
 use super::scram_auth::{ScramPassword, AsyncScramAuthServer, AsyncScramAuthClient};
@@ -582,9 +582,7 @@ impl<'sc, S: ScramHashing, A: AsyncScramAuthClient> AsyncScramClient<'sc, S, A>
 
 #[test]
 fn scram_sha256_server() 
-{ 
-    use std::time::Instant;
-    
+{     
     use async_trait::async_trait; 
 
     use super::scram_hashing::{ScramSha256};
@@ -636,8 +634,7 @@ fn scram_sha256_server()
     let _server_nonce_dec = b"\x86\xf6\x03\xa5e\x1a\xd9\x16\x93\x08\x07\xee\xc4R%\x8e\x13e\x16M".to_vec();
     let client_final = "c=biws,r=rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0,p=dHzbZapWIk4jUhN+Ute9ytag9zjfMHgsqmmiz7AndVQ=";
     let server_final = "v=6rriTRBi23WpRR/wtup+mMhUZUn/dB5nLTJRsjl95G4=";
-    
-    let _start = Instant::now();
+
 
     let serv = AuthServer::new();
     let nonce = ScramNonce::Base64(server_nonce);
@@ -649,7 +646,6 @@ fn scram_sha256_server()
 
     let mut scram = scram_res.unwrap();
 
-    let start = Instant::now();
     let resp_res = 
         tokio_test::block_on(async {scram.parse_response(client_init, false).await});
 
@@ -667,9 +663,7 @@ fn scram_sha256_server()
         assert_eq!(false, true);
         return;
     }
-    
-    let el = start.elapsed();
-    println!("took: {:?}", el);
+
 
     let resp = resp_res.unwrap().extract_output().unwrap();
     assert_eq!( resp.as_str(), server_final ); 
@@ -678,8 +672,6 @@ fn scram_sha256_server()
 #[test]
 fn scram_sha256_works() 
 { 
-    use std::time::Instant;
-
     use async_trait::async_trait; 
 
     use super::scram_hashing::ScramSha256;
@@ -723,8 +715,7 @@ fn scram_sha256_works()
     let _server_nonce_dec = b"\x86\xf6\x03\xa5e\x1a\xd9\x16\x93\x08\x07\xee\xc4R%\x8e\x13e\x16M";
     let client_final = "c=biws,r=rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0,p=dHzbZapWIk4jUhN+Ute9ytag9zjfMHgsqmmiz7AndVQ=";
     let server_final = "v=6rriTRBi23WpRR/wtup+mMhUZUn/dB5nLTJRsjl95G4=";
-    
-    let start = Instant::now();
+
 
     let cbt = ClientChannelBindingType::without_chan_binding();
 
@@ -751,9 +742,6 @@ fn scram_sha256_works()
     let res = 
         tokio_test::block_on(async {scram.parse_response(server_final, false).await});
     assert_eq!(res.is_ok(), true);
-
-    let el = start.elapsed();
-    println!("took: {:?}", el);
 
     assert_eq!(scram.is_completed(), true);
 }

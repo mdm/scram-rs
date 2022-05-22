@@ -12,7 +12,7 @@ use std::num::NonZeroU32;
 use std::str;
 use std::marker::PhantomData;
 
-use super::scram_error::{ScramResult, ScramRuntimeError, ScramErrorCode};
+use super::scram_error::{ScramResult, ScramErrorCode};
 use super::{scram_error, scram_error_map};
 use super::scram_cb::{ServerChannelBindType, ClientChannelBindingType};
 use super::scram_auth::{ScramPassword, ScramAuthServer, ScramAuthClient};

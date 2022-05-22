@@ -13,7 +13,7 @@ use std::str;
 use std::str::Chars;
 use std::iter::Peekable;
 
-use super::scram_error::{ScramResult, ScramRuntimeError, ScramErrorCode};
+use super::scram_error::{ScramResult, ScramErrorCode};
 use super::{scram_error, scram_error_map};
 use super::scram_cb::ServerChannelBindType;
 use super::scram_state::ScramState;

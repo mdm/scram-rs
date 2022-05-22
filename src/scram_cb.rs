@@ -11,7 +11,7 @@
 use std::fmt;
 
 use super::scram_common::ScramType;
-use super::scram_error::{ScramResult, ScramRuntimeError, ScramErrorCode};
+use super::scram_error::{ScramResult, ScramErrorCode};
 use super::{scram_error};
 
 /// A channel binding type picked by client.

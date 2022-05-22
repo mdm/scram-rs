@@ -83,7 +83,7 @@ pub type ScramResult<T> = Result<T, ScramRuntimeError>;
 macro_rules! scram_error 
 {
     ($src:expr,$($arg:tt)*) => (
-        return std::result::Result::Err(ScramRuntimeError::new($src, format!($($arg)*)))
+        return std::result::Result::Err($crate::ScramRuntimeError::new($src, format!($($arg)*)))
     )
 }
 
@@ -91,6 +91,6 @@ macro_rules! scram_error
 macro_rules! scram_error_map
 {
     ($src:expr,$($arg:tt)*) => (
-        ScramRuntimeError::new($src, format!($($arg)*))
+        $crate::ScramRuntimeError::new($src, format!($($arg)*))
     )
 }

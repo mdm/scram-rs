@@ -9,7 +9,7 @@
  */
 
 
-use super::scram_error::{ScramResult, ScramRuntimeError, ScramErrorCode};
+use super::scram_error::{ScramResult, ScramErrorCode};
 use super::{scram_error};
 use super::scram_common::ScramCommon;
 

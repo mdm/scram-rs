@@ -13,7 +13,7 @@ use std::num::NonZeroU32;
 
 use getrandom::getrandom;
 
-use super::scram_error::{ScramResult, ScramRuntimeError, ScramErrorCode};
+use super::scram_error::{ScramResult, ScramErrorCode};
 use super::{scram_error, scram_error_map};
 
 /// A numeric alias for the [SCRAM_TYPES]. If any changes were made in

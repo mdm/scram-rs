@@ -12,6 +12,8 @@ use std::num::NonZeroU32;
 
 use async_trait::async_trait;
 
+use crate::{scram_error_map, ScramErrorCode};
+
 use super::scram_error::{ScramResult};
 
 use super::scram_common::ScramCommon;
@@ -204,6 +206,41 @@ impl ScramPassword
                 salt_b64: salt_base64,
                 iterations: iterations,
             };
+    }
+
+    /// A program which utilizes this crate should call this function if user was found
+    /// but password was salted and hashed and salt with iterations count were provided.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `salted_hashed_password` - a base64 salted and hashed password
+    /// 
+    /// * `salt` - a salt
+    /// 
+    /// * `iterations` - iterations count
+    /// 
+    /// # Throws
+    /// 
+    /// May throw an error.
+    pub 
+    fn found_secret_base64_password(
+        salted_hashed_password: String, 
+        salt_base64: String, 
+        iterations: NonZeroU32
+    ) -> ScramResult<Self>
+    {
+        return Ok(
+            Self::UserPasswordData
+            {
+                salted_hashed_password: 
+                    base64::decode(salted_hashed_password)
+                        .map_err(|e| 
+                            scram_error_map!(ScramErrorCode::ExternalError, "base64 decode error, {}", e)
+                        )?,
+                salt_b64: salt_base64,
+                iterations: iterations,
+            }
+        );
     }
 
     /// A function which can be used for salted password generation from
