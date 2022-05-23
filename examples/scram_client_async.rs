@@ -11,6 +11,7 @@ struct AuthClient
 {
     username: String,
     password: String,
+    key: scram_rs::ScramKey,
 }
 
 #[async_trait]
@@ -25,13 +26,18 @@ impl AsyncScramAuthClient for AuthClient
     {
         return &self.password;
     }
+
+    async fn get_scram_keys(&self) -> &scram_rs::ScramKey 
+    {
+        return &self.key;
+    }
 }
 
 impl AuthClient
 {
     pub fn new(u: &'static str, p: &'static str) -> Self
     {
-        return AuthClient{username: u.to_string(), password: p.to_string()};
+        return AuthClient{username: u.to_string(), password: p.to_string(), key: scram_rs::ScramKey::new()};
     }
 }
 
@@ -59,7 +65,7 @@ pub fn main() -> ScramResult<()>
     // get initial packet
 
     let _initial_msg = 
-        tokio_test::block_on(async {scram_res.init_client(true).await});
+        tokio_test::block_on(async {scram_res.init_client().await});
 
     // send to server
     // stream.send(initial_msg);
@@ -69,7 +75,7 @@ pub fn main() -> ScramResult<()>
     let res = 
         tokio_test::block_on(async {scram_res.parse_response_base64(answer).await});
 
-    let _msg = res.unwrap().extract_output();
+    let _msg = res.unwrap().unwrap_output();
     // send to server
     // stream.send(msg);
 

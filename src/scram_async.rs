@@ -12,6 +12,8 @@ use std::num::NonZeroU32;
 use std::str;
 use std::marker::PhantomData;
 
+use crate::ScramResultServer;
+
 use super::scram_error::{ScramResult, ScramErrorCode};
 use super::{scram_error, scram_error_map};
 use super::scram_cb::{ServerChannelBindType, ClientChannelBindingType};
@@ -20,7 +22,7 @@ use super::scram_hashing::ScramHashing;
 use super::scram_common::{ScramType, ScramCommon};
 use super::scram_state::ScramState;
 use super::scram_parser::*;
-use super::scram::{ScramNonce, ScramParse};
+use super::scram::{ScramNonce, ScramResultClient};
 
 
 /// # A Scram Server  
@@ -130,7 +132,7 @@ impl<'ss, S: ScramHashing, A: AsyncScramAuthServer<S>> AsyncScramServer<'ss, S, 
     /// 
     /// * ScramResult<[ScramParse]> the response will be encoded to UTF-8
     pub async 
-    fn parse_response_base64<T>(&mut self, input: T) -> ScramResult<ScramParse>
+    fn parse_response_base64<T>(&mut self, input: T) -> ScramResult<ScramResultServer>
     where T: AsRef<[u8]>
     {
         let decoded = 
@@ -153,7 +155,7 @@ impl<'ss, S: ScramHashing, A: AsyncScramAuthServer<S>> AsyncScramServer<'ss, S, 
                     )
                 )?;
 
-        return self.parse_response(dec_utf8, true).await;
+        return self.parse_response(dec_utf8).await;
     }
 
     /// Performes parsing of the response from client and result computation.  
@@ -170,7 +172,7 @@ impl<'ss, S: ScramHashing, A: AsyncScramAuthServer<S>> AsyncScramServer<'ss, S, 
     /// * ScramResult<[ScramParse]> the response will be encoded to UTF-8 depending on
     /// argument `to_base`
     pub async 
-    fn parse_response(&mut self, resp: &str, to_base: bool) -> ScramResult<ScramParse>
+    fn parse_response(&mut self, resp: &str) -> ScramResult<ScramResultServer>
     {
         let parsed_resp = ScramDataParser::from_raw(resp, &self.state)?;
 
@@ -208,14 +210,7 @@ impl<'ss, S: ScramHashing, A: AsyncScramAuthServer<S>> AsyncScramServer<'ss, S, 
                 self.sp = sp;
                 self.state = ScramState::WaitForClientFinalMsg{client_nonce: String::from(nonce)};
 
-                if to_base == true
-                {
-                    return Ok(ScramParse::Output(base64::encode(output)));
-                }
-                else
-                {
-                    return Ok(ScramParse::Output(output));
-                }
+                return Ok(ScramResultServer{ raw_out: output, completed: false });
             },
             ScramData::SmsgInitial{..} => 
             {
@@ -269,9 +264,10 @@ impl<'ss, S: ScramHashing, A: AsyncScramAuthServer<S>> AsyncScramServer<'ss, S, 
                         &client_final_without_proof,
                     ].concat();
                 
-                
-                let client_key = S::hmac(b"Client Key", &self.sp.get_salted_hashed_password())?;
-                let server_key = S::hmac(b"Server Key", &self.sp.get_salted_hashed_password())?;
+                let keys = self.sp.get_scram_keys();
+
+                let client_key = S::hmac(keys.get_clinet_key(), &self.sp.get_salted_hashed_password())?;
+                let server_key = S::hmac(keys.get_server_key(), &self.sp.get_salted_hashed_password())?;
                 let stored_key = S::hash(&client_key);
                 let client_signature = S::hmac(authmsg.as_bytes(), &stored_key)?;
                 let server_signature = S::hmac(authmsg.as_bytes(), &server_key)?;
@@ -302,14 +298,7 @@ impl<'ss, S: ScramHashing, A: AsyncScramAuthServer<S>> AsyncScramServer<'ss, S, 
                 // update states
                 self.state = ScramState::Completed;
 
-                if to_base == true
-                {
-                    return Ok(ScramParse::Output(base64::encode(output)));
-                }
-                else
-                {
-                    return Ok(ScramParse::Output(output));
-                }
+                return Ok(ScramResultServer{ raw_out: output, completed: true });
             },
             ScramData::SmsgFinalMessage{..} =>
             {
@@ -408,25 +397,18 @@ impl<'sc, S: ScramHashing, A: AsyncScramAuthClient> AsyncScramClient<'sc, S, A>
     /// # Returns
     /// * base64 encoded or plain string with formed message
     pub async 
-    fn init_client(&mut self, to_base64: bool) -> String
-    {            
+    fn init_client(&mut self) -> ScramResultClient
+    {       
         let compiled = 
             [
                 self.chanbind.convert2header(),
-                b"n=", self.auth.get_username().await.as_bytes(),
-                b",r=", &self.client_nonce.as_bytes()
+                "n=", self.auth.get_username().await,
+                ",r=", self.client_nonce.as_str(),
             ].concat();
-        
+    
         self.state = ScramState::WaitForServInitMsg;     
         
-        if to_base64 == true
-        {
-            return base64::encode(compiled);
-        }
-        else
-        {
-            return unsafe { String::from_utf8_unchecked(compiled) };
-        }
+        return ScramResultClient::Output(compiled);
     }
 
     /// Decodes the response from server which is in base64 encoded and performes parsing
@@ -440,7 +422,7 @@ impl<'sc, S: ScramHashing, A: AsyncScramAuthClient> AsyncScramClient<'sc, S, A>
     /// 
     /// * ScramResult<[ScramParse]> the response will be encoded to UTF-8 
     pub async 
-    fn parse_response_base64<T: AsRef<[u8]>>(&mut self, input: T) -> ScramResult<ScramParse>
+    fn parse_response_base64<T: AsRef<[u8]>>(&mut self, input: T) -> ScramResult<ScramResultClient>
     {
         let decoded = 
             base64::decode(input)
@@ -462,7 +444,7 @@ impl<'sc, S: ScramHashing, A: AsyncScramAuthClient> AsyncScramClient<'sc, S, A>
                     )
                 )?;
 
-        return self.parse_response(dec_utf8, true).await;
+        return self.parse_response(dec_utf8).await;
     }
 
     /// Performes parsing of the response from server and result computation.  
@@ -479,7 +461,7 @@ impl<'sc, S: ScramHashing, A: AsyncScramAuthClient> AsyncScramClient<'sc, S, A>
     /// * ScramResult<[ScramParse]> the response will be encoded to UTF-8 depending on
     /// argument `to_base64`
     pub async 
-    fn parse_response(&mut self, resp: &str, to_base64: bool) -> ScramResult<ScramParse>
+    fn parse_response(&mut self, resp: &str) -> ScramResult<ScramResultClient>
     {
         let parsed_resp = ScramDataParser::from_raw(&resp, &self.state)?;
 
@@ -506,7 +488,7 @@ impl<'sc, S: ScramHashing, A: AsyncScramAuthClient> AsyncScramClient<'sc, S, A>
                 let cb_data = 
                     base64::encode(
                         [
-                            self.chanbind.convert2header(), 
+                            self.chanbind.convert2header().as_bytes(), 
                             self.chanbind.convert2data()
                         ].concat()
                     );
@@ -515,23 +497,26 @@ impl<'sc, S: ScramHashing, A: AsyncScramAuthClient> AsyncScramClient<'sc, S, A>
 
                 let authmsg = 
                     [
-                        b"n=", self.auth.get_username().await.as_bytes(),
-                        b",r=", self.client_nonce.as_bytes(), 
-                        b",", resp.as_bytes(),
-                        b",", client_final_message_bare.as_bytes()
+                        "n=", self.auth.get_username().await,
+                        ",r=", self.client_nonce.as_str(), 
+                        ",", resp,
+                        ",", client_final_message_bare.as_str()
                     ].concat();
+
+                // get keys (client, server keys)
+                let keys = self.auth.get_scram_keys().await;
 
                 let salted_password = 
                     S::derive(self.auth.get_password().await.as_bytes(), &salt, NonZeroU32::new(itrcnt).unwrap())?;
 
-                let client_key = S::hmac(b"Client Key", &salted_password)?;
-                let server_key = S::hmac(b"Server Key", &salted_password)?;
+                let client_key = S::hmac(keys.get_clinet_key(), &salted_password)?;
+                let server_key = S::hmac(keys.get_server_key(), &salted_password)?;
 
                 
 
                 let stored_key = S::hash(&client_key);
-                let client_signature = S::hmac(&authmsg, &stored_key)?;
-                let server_signature = S::hmac(&authmsg, &server_key)?;
+                let client_signature = S::hmac(authmsg.as_bytes(), &stored_key)?;
+                let server_signature = S::hmac(authmsg.as_bytes(), &server_key)?;
                 
                 let client_response = 
                     [
@@ -543,15 +528,7 @@ impl<'sc, S: ScramHashing, A: AsyncScramAuthClient> AsyncScramClient<'sc, S, A>
 
                 self.state = ScramState::WaitForServFinalMsg{server_signature: server_signature};
                 
-                if to_base64 == true
-                {
-                    return Ok(ScramParse::Output(base64::encode(client_response)));
-                }
-                else
-                {
-                    return Ok(ScramParse::Output(client_response));
-                }
-                
+                return Ok(ScramResultClient::Output(client_response));
             },
             ScramData::CmsgFinalMessage{..} =>
             {
@@ -563,7 +540,7 @@ impl<'sc, S: ScramHashing, A: AsyncScramAuthClient> AsyncScramClient<'sc, S, A>
                 {
                     self.state = ScramState::Completed;
 
-                    return Ok(ScramParse::Completed);
+                    return Ok(ScramResultClient::Completed);
                 }
                 else
                 {
@@ -607,7 +584,8 @@ fn scram_sha256_server()
                     ScramPassword::found_secret_password(
                         ScramSha256::derive(password.as_bytes(), &salt, iterations).unwrap(),
                         base64::encode(salt), 
-                        iterations
+                        iterations,
+                        None
                     )
                 );
 
@@ -647,15 +625,17 @@ fn scram_sha256_server()
     let mut scram = scram_res.unwrap();
 
     let resp_res = 
-        tokio_test::block_on(async {scram.parse_response(client_init, false).await});
+        tokio_test::block_on(async {scram.parse_response(client_init).await});
 
     assert_eq!(resp_res.is_ok(), true);
 
-    let resp = resp_res.unwrap().extract_output().unwrap();
-    assert_eq!( resp.as_str(), server_init ); 
+    let resp_res = resp_res.unwrap();
+
+    let resp = resp_res.get_raw_output();
+    assert_eq!( resp, server_init ); 
 
     let resp_res = 
-        tokio_test::block_on(async {scram.parse_response(client_final, false).await});
+        tokio_test::block_on(async {scram.parse_response(client_final).await});
 
     if resp_res.is_err() == true
     {
@@ -664,9 +644,10 @@ fn scram_sha256_server()
         return;
     }
 
+    let resp_res = resp_res.unwrap();
 
-    let resp = resp_res.unwrap().extract_output().unwrap();
-    assert_eq!( resp.as_str(), server_final ); 
+    let resp = resp_res.get_raw_output();
+    assert_eq!( resp, server_final ); 
 }
 
 #[test]
@@ -676,24 +657,34 @@ fn scram_sha256_works()
 
     use super::scram_hashing::ScramSha256;
     use super::scram_auth::AsyncScramAuthClient;
+    use super::scram_auth::ScramKey;
 
     struct AuthClient
     {
         username: String,
         password: String,
+        key: ScramKey,
     }
 
     #[async_trait]
     impl AsyncScramAuthClient for AuthClient
     {
-        async fn get_username(&self) -> &str
+        async 
+        fn get_username(&self) -> &str
         {
             return &self.username;
         }
 
-        async fn get_password(&self) -> &str
+        async 
+        fn get_password(&self) -> &str
         {
             return &self.password;
+        }
+
+        async 
+        fn get_scram_keys(&self) -> &ScramKey
+        {
+            return &self.key;
         }
     }
 
@@ -701,7 +692,7 @@ fn scram_sha256_works()
     {
         pub fn new(u: &'static str, p: &'static str) -> Self
         {
-            return AuthClient{username: u.to_string(), password: p.to_string()};
+            return AuthClient{username: u.to_string(), password: p.to_string(), key: ScramKey::new()};
         }
     }
 
@@ -729,18 +720,18 @@ fn scram_sha256_works()
     let mut scram = scram_res.unwrap();
     
     let init = 
-        tokio_test::block_on(async {scram.init_client(false).await});
-    assert_eq!( init.as_str(), client_init ); 
+        tokio_test::block_on(async {scram.init_client().await});
+    assert_eq!( init.get_output().unwrap(), client_init ); 
 
     let resp_res = 
-        tokio_test::block_on(async {scram.parse_response(server_init, false).await});
+        tokio_test::block_on(async {scram.parse_response(server_init).await});
     assert_eq!(resp_res.is_ok(), true);
 
-    let resp = resp_res.unwrap().extract_output().unwrap();
+    let resp = resp_res.unwrap().unwrap_output().unwrap();
     assert_eq!( resp.as_str(), client_final ); 
 
     let res = 
-        tokio_test::block_on(async {scram.parse_response(server_final, false).await});
+        tokio_test::block_on(async {scram.parse_response(server_final).await});
     assert_eq!(res.is_ok(), true);
 
     assert_eq!(scram.is_completed(), true);

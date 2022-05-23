@@ -11,6 +11,7 @@ struct AuthClient
 {
     username: String,
     password: String,
+    key: scram_rs::ScramKey,
 }
 
 impl ScramAuthClient for AuthClient
@@ -24,13 +25,18 @@ impl ScramAuthClient for AuthClient
     {
         return &self.password;
     }
+
+    fn get_scram_keys(&self) -> &scram_rs::ScramKey 
+    {
+        return &self.key;
+    }
 }
 
 impl AuthClient
 {
     pub fn new(u: &'static str, p: &'static str) -> Self
     {
-        return AuthClient{username: u.to_string(), password: p.to_string()};
+        return AuthClient{username: u.to_string(), password: p.to_string(), key: scram_rs::ScramKey::new()};
     }
 }
 
@@ -57,7 +63,7 @@ pub fn main() -> ScramResult<()>
 
     // get initial packet
 
-    let _initial_msg = scram_res.init_client(true);
+    let _initial_msg = scram_res.init_client();
 
     // send to server
     // stream.send(initial_msg);
@@ -66,7 +72,7 @@ pub fn main() -> ScramResult<()>
     let answer = mock_stream_recv();
     let res = scram_res.parse_response_base64(answer)?;
 
-    let _msg = res.extract_output()?;
+    let _msg = res.unwrap_output()?;
     // send to server
     // stream.send(msg);
 

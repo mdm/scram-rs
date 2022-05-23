@@ -35,7 +35,8 @@ impl AsyncScramAuthServer<ScramSha256> for AuthDB
         Ok(ScramPassword::found_secret_password(
                 ScramSha256::derive(password.as_bytes(), &salt, iter).unwrap(),
                 base64::encode(salt), 
-                iter))
+                iter,
+            None))
 
                 
     }
@@ -52,7 +53,7 @@ pub fn main() -> ScramResult<()>
 
     let client_init = "n,,n=user,r=rOprNGfwEbeRWgbNEkqO";
     let _ = 
-        tokio_test::block_on(async {server.parse_response(client_init, false).await});
+        tokio_test::block_on(async {server.parse_response(client_init).await});
 
     //...
     return Ok(());

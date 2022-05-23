@@ -19,6 +19,58 @@ use super::scram_error::{ScramResult};
 use super::scram_common::ScramCommon;
 use super::scram_hashing::ScramHashing;
 
+/// A Scram client/server key storage.
+#[derive(Debug, PartialEq, Eq)]
+pub struct ScramKey
+{
+    client_key: Option<Vec<u8>>,
+    server_key: Option<Vec<u8>>,
+}
+
+impl ScramKey
+{
+    pub const DEFAULT_CLIENT_KEY: &'static [u8] = b"Client Key";
+    pub const DEFAULT_SERVER_KEY: &'static [u8] = b"Server Key";
+
+    pub 
+    fn get_clinet_key(&self) -> &[u8]
+    {
+        match self.client_key
+        {
+            Some(ref key) => return key.as_slice(),
+            None => return Self::DEFAULT_CLIENT_KEY,
+        }
+    }
+
+    pub 
+    fn get_server_key(&self) -> &[u8]
+    {
+        match self.server_key
+        {
+            Some(ref key) => return key.as_slice(),
+            None => return Self::DEFAULT_SERVER_KEY,
+        }
+    }
+
+    pub 
+    fn new() -> Self
+    {
+        return Self{ client_key: None, server_key: None };
+    }
+
+    pub 
+    fn set_client_key(&mut self, key: Vec<u8>)
+    {
+        self.client_key = Some(key);
+    }
+
+    pub 
+    fn set_server_key(&mut self, key: Vec<u8>)
+    {
+        self.server_key = Some(key);
+    }
+}
+
 /// A authentification callback returns this enum. 
 /// 
 /// The callback should use implemented functions to generate the result!
@@ -39,6 +91,8 @@ pub enum ScramPassword
         salt_b64: String,
         /// iteration count
         iterations: NonZeroU32,
+        /// keys
+        scram_keys: ScramKey,
     },
 
     /// User was found with or without salt data
@@ -50,6 +104,8 @@ pub enum ScramPassword
         salt_b64: String,
         /// iteration count
         iterations: NonZeroU32,
+        /// keys
+        scram_keys: ScramKey,
     }
 }
 
@@ -107,6 +163,7 @@ impl ScramPassword
                 salted_hashed_password: salted_password,
                 salt_b64: base64::encode(salt),
                 iterations: ScramCommon::SCRAM_DEFAULT_SALT_ITER,
+                scram_keys: ScramKey::new(),
             };
 
         return Ok(ret);
@@ -124,7 +181,8 @@ impl ScramPassword
     /// 
     /// May throw an error.
     pub 
-    fn found_plaintext_password<S: ScramHashing>(pass: &[u8]) -> ScramResult<Self>
+    fn found_plaintext_password<S>(pass: &[u8], scram_keys_opt: Option<ScramKey>) -> ScramResult<Self>
+    where S: ScramHashing
     {
         //generate salt and iterations
         let salt = ScramPassword::scram_mock_salt()?;
@@ -138,6 +196,7 @@ impl ScramPassword
                 salted_hashed_password: salted_password,
                 salt_b64: base64::encode(salt),
                 iterations: ScramCommon::SCRAM_DEFAULT_SALT_ITER,
+                scram_keys: scram_keys_opt.unwrap_or(ScramKey::new()),
             };
 
         return Ok(ret);
@@ -158,7 +217,8 @@ impl ScramPassword
     pub 
     fn found_plaintext_password_with_iterations<S>(
         pass: &[u8], 
-        iterations: NonZeroU32
+        iterations: NonZeroU32, 
+        scram_keys_opt: Option<ScramKey>
     ) -> ScramResult<Self>
     where S: ScramHashing
     {
@@ -173,6 +233,7 @@ impl ScramPassword
                 salted_hashed_password: salted_password,
                 salt_b64: base64::encode(salt),
                 iterations: iterations,
+                scram_keys: scram_keys_opt.unwrap_or(ScramKey::new()),
             };
 
         return Ok(ret);
@@ -196,7 +257,8 @@ impl ScramPassword
     fn found_secret_password(
         salted_hashed_password: Vec<u8>, 
         salt_base64: String, 
-        iterations: NonZeroU32
+        iterations: NonZeroU32,
+        scram_keys_opt: Option<ScramKey>
     ) -> Self
     {
         return 
@@ -205,6 +267,7 @@ impl ScramPassword
                 salted_hashed_password: salted_hashed_password,
                 salt_b64: salt_base64,
                 iterations: iterations,
+                scram_keys: scram_keys_opt.unwrap_or(ScramKey::new()),
             };
     }
 
@@ -226,7 +289,8 @@ impl ScramPassword
     fn found_secret_base64_password(
         salted_hashed_password: String, 
         salt_base64: String, 
-        iterations: NonZeroU32
+        iterations: NonZeroU32,
+        scram_keys_opt: Option<ScramKey>
     ) -> ScramResult<Self>
     {
         return Ok(
@@ -239,6 +303,7 @@ impl ScramPassword
                         )?,
                 salt_b64: salt_base64,
                 iterations: iterations,
+                scram_keys: scram_keys_opt.unwrap_or(ScramKey::new()),
             }
         );
     }
@@ -266,7 +331,8 @@ impl ScramPassword
     fn salt_password_with_params<U, S>(
         pass_plain: U, 
         salt_plain: Option<Vec<u8>>, 
-        iter: Option<NonZeroU32>
+        iter: Option<NonZeroU32>,
+        scram_keys_opt: Option<ScramKey>
     ) -> ScramResult<Self>
     where S: ScramHashing, U: AsRef<[u8]>
     {
@@ -292,6 +358,7 @@ impl ScramPassword
                 salted_hashed_password: salted_password,
                 salt_b64: base64::encode(salt),
                 iterations: iterations,
+                scram_keys: scram_keys_opt.unwrap_or(ScramKey::new()),
             };
 
         return Ok(ret);
@@ -328,8 +395,19 @@ impl ScramPassword
         match *self
         {
             Self::None => panic!("misuse get_salted_hashed_password()"),
-            Self::UserNotFound{ref salted_hashed_password, ..} => return &salted_hashed_password,
-            Self::UserPasswordData{ref salted_hashed_password, ..} => return &salted_hashed_password,
+            Self::UserNotFound{ref salted_hashed_password, ..} => return salted_hashed_password.as_slice(),
+            Self::UserPasswordData{ref salted_hashed_password, ..} => return salted_hashed_password.as_slice(),
+        }
+    }
+
+    pub 
+    fn get_scram_keys(&self) -> &ScramKey
+    {
+        match *self
+        {
+            Self::None => panic!("misuse get_salted_hashed_password()"),
+            Self::UserNotFound{ref scram_keys, ..} => return scram_keys,
+            Self::UserPasswordData{ref scram_keys, ..} => return scram_keys,
         }
     }
 }
@@ -444,6 +522,8 @@ pub trait ScramAuthClient
     fn get_username(&self) -> &str;
     /// This function must return plain text password
     fn get_password(&self) -> &str;
+    /// This function returns a ref to [ScramKey]
+    fn get_scram_keys(&self) -> &ScramKey;
 }
 
 
@@ -476,10 +556,12 @@ pub trait AsyncScramAuthClient
     async fn get_username(&self) -> &str;
     /// This function must return plain text password
     async fn get_password(&self) -> &str;
+    /// This function returns a ref to [ScramKey]
+    async fn get_scram_keys(&self) -> &ScramKey;
 }
 
 #[test]
-fn test_speed()
+fn test_exec_time()
 {
     use std::time::Instant;
     use super::scram_hashing::ScramSha256;
@@ -494,7 +576,7 @@ fn test_speed()
 
     let start = Instant::now();
 
-    let res = ScramPassword::found_plaintext_password::<ScramSha256>(b"123");
+    let res = ScramPassword::found_plaintext_password::<ScramSha256>(b"123", None);
     assert_eq!(res.is_ok(), true);
     
     let el = start.elapsed();
@@ -514,7 +596,8 @@ fn test_password_gen()
         ScramPassword::salt_password_with_params::<_, ScramSha256>(
             "pencil".to_string().into_bytes(), 
             Some("test".to_string().into_bytes()), 
-            Some(NonZeroU32::new(4096).unwrap())
+            Some(NonZeroU32::new(4096).unwrap()),
+            None,
         );
 
     let el = start.elapsed();

@@ -9,6 +9,8 @@
  */
 
 
+use std::mem;
+
 use super::scram_error::{ScramResult, ScramErrorCode};
 use super::{scram_error};
 use super::scram_common::ScramCommon;
@@ -16,54 +18,139 @@ use super::scram_common::ScramCommon;
 pub use super::scram_sync;
 pub use super::scram_async;
 
+/// A state encoder for Scram Client.
+/// There is an internal state machine which automatically changes the
+///  state. The timeout and other things must be implemented separatly.
+///  The state from internal state machine is not exposed. If needed can
+///  be maintained separatly.
+#[derive(Debug)]
+pub struct ScramResultServer
+{   
+    /// A response to send (raw)
+    pub raw_out: String,
 
-/// A returned datatype from both Server/Client parser.  
-/// If [ScramParse::Output] then a response was prepared.  
-/// If [ScramParse::Completed] then no other action is required.
-pub enum ScramParse
-{
-    /// Data is prepared to be sent to Server or Client
-    Output(String),
-
-    /// Final stage, no more parsing is required
-    Completed,
+    /// If set to true, the last response is generated and auth
+    ///  completes.
+    pub completed: bool,
 }
 
-impl ScramParse
+impl ScramResultServer
 {
-    /// Is current instance is Output(...)
+    /// Tells if auth seq completed.
+    pub 
+    fn is_completed(&self) -> bool
+    {
+        return self.completed;
+    }
+
+    /// Encodes the raw result to base64.
+    pub 
+    fn encode_base64(&self) -> String
+    {
+        return base64::encode(&self.raw_out);
+    }
+
+    /// Returns the ref [str] to raw output.
+    pub 
+    fn get_raw_output(&self) -> &str
+    {
+        return self.raw_out.as_str();
+    }
+}
+
+/// A state encoder for Scram Client.
+/// There is an internal state machine which automatically changes the
+///  state. The timeout and other things must be implemented separatly.
+///  The state from internal state machine is not exposed. If needed can
+///  be maintained separatly.
+#[derive(Debug)]
+pub enum ScramResultClient
+{
+    /// A response was composed and stored in raw format
+    Output( String ),
+
+    /// Final stage, no more parsing is required, auth was successful.
+    /// If auth failed an error will be thrown.
+    Completed
+}
+
+impl ScramResultClient
+{
+    /// Tells if the current status is [ScramResultClient::Output]
     pub 
     fn is_output(&self) -> bool
     {
-        match *self
-        {
-            ScramParse::Output(_) => return true,
-            ScramParse::Completed => return false
-        }
+        return 
+            mem::discriminant(self) == mem::discriminant(&ScramResultClient::Output( String::new() ));
     }
 
-    /// Is current instance is Completed
+    /// Tells is current status is [ScramResultClient::Completed].
     pub 
     fn is_final(&self) -> bool
     {
-        match *self
-        {
-            ScramParse::Output(_) => return false,
-            ScramParse::Completed => return true
-        }
+        return 
+            mem::discriminant(self) == mem::discriminant(&ScramResultClient::Completed);
     }
 
-    /// Extracts data from Output(...). Will throw an error if
-    /// current state is Completed.
+    /// Unwraps the result which should be sent to server. The result is raw and
+    ///  not encoded to base64!
+    /// 
+    /// # Returns
+    /// 
+    /// * [ScramResult]
+    ///     - Ok() with payload (raw output)
+    ///     - Err(e) [ScramErrorCode::AuthSeqCompleted] if called on state
+    ///         [ScramResultClient::Completed].
     pub 
-    fn extract_output(self) -> ScramResult<String>
+    fn unwrap_output(self) -> ScramResult<String>
     {
         match self
         {
-            ScramParse::Output(r) => 
-                return Ok(r),
-            ScramParse::Completed => 
-                scram_error!(ScramErrorCode::InternalError, "completed, nothing to extract"),
+            ScramResultClient::Output(output) => 
+                return Ok(output),
+            ScramResultClient::Completed => 
+                scram_error!(ScramErrorCode::AuthSeqCompleted, "completed, nothing to extract"),
+        }
+    }
+
+    /// Unwraps the result which should be sent to server and returns a ref
+    ///  [str]. The result is raw and not encoded to base64!
+    /// 
+    /// # Returns
+    /// 
+    /// * [ScramResult]
+    ///     - Ok() with payload (raw output)
+    ///     - Err(e) [ScramErrorCode::AuthSeqCompleted] if called on state
+    ///         [ScramResultClient::Completed].
+    pub 
+    fn get_output(&self) -> ScramResult<&str>
+    {
+        match self
+        {
+            ScramResultClient::Output(output) => 
+                return Ok(output.as_str()),
+            ScramResultClient::Completed => 
+                scram_error!(ScramErrorCode::AuthSeqCompleted, "completed, nothing to extract"),
+        }
+    }
+
+    /// Encodes the output to base64.
+    /// 
+    /// # Returns
+    /// 
+    /// * [ScramResult]
+    ///     - Ok() with payload (encoded to base64 output)
+    ///     - Err(e) [ScramErrorCode::AuthSeqCompleted] if called on state
+    ///         [ScramResultClient::Completed].
+    pub 
+    fn encode_output_base64(&self) -> ScramResult<String>
+    {
+        match self
+        {
+            ScramResultClient::Output(output) => 
+                return Ok(base64::encode(output)),
+            ScramResultClient::Completed => 
+                scram_error!(ScramErrorCode::AuthSeqCompleted, "completed, nothing to extract"),
         }
     }
 }

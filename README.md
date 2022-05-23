@@ -1,6 +1,6 @@
 # Scram-rs
 
-v 0.4
+v 0.5
 
 A SCRAM-SHA1, SCRAM-SHA256, SCRAM-SHA512 SCRAM-SHA256-PLUS client and server.  
 
@@ -11,8 +11,9 @@ A SCRAM-SHA1, SCRAM-SHA256, SCRAM-SHA512 SCRAM-SHA256-PLUS client and server.
 - Client/Server sync
 - Server Channel Binding TLS-Server-Endpoint 256, 512 untested
 - Client Channel Binding TLS-Server-Endpoint 256, 512 untested
-- a partial support (untested) of async which allows to integrate it in async code
+- a partial support of async which allows to integrate it in async code
   or use with async
+- Client/Server key (custom)
 
 ## Does not support:
 - authzid (a=)

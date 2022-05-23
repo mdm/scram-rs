@@ -307,14 +307,14 @@ impl ClientChannelBindingType
 
     /// Converts the [ClientChannelBindingType] to protocol header text 
     pub 
-    fn convert2header(&self) -> &[u8]
+    fn convert2header(&self) -> &str
     {
         match self
         {
-            Self::None => return b"n,,",
-            Self::Unsupported => return b"y,,",
+            Self::None => return "n,,",
+            Self::Unsupported => return "y,,",
             //Self::TlsUnique => panic!("not supported yet"), //"p=tls-unique,,"
-            Self::TlsServerEndpoint{..} => b"p=tls-server-end-point,,"
+            Self::TlsServerEndpoint{..} => "p=tls-server-end-point,,"
         }
     }
 

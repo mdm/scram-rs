@@ -32,10 +32,14 @@ impl ScramAuthServer<ScramSha256> for AuthDB
         let salt = b"[m\x99h\x9d\x125\x8e\xec\xa0K\x14\x126\xfa\x81".to_vec();
         let iter = NonZeroU32::new(4096).unwrap();
 
-        Ok(ScramPassword::found_secret_password(
+        Ok(
+            ScramPassword::found_secret_password(
                 ScramSha256::derive(password.as_bytes(), &salt, iter).unwrap(),
                 base64::encode(salt), 
-                iter))
+                iter,
+            None
+            )
+        )
 
                 
     }
@@ -51,7 +55,7 @@ pub fn main() -> ScramResult<()>
         SyncScramServer::<ScramSha256, AuthDB>::new(&authdb, None, ScramNonce::none(), scramtype).unwrap();
 
     let client_init = "n,,n=user,r=rOprNGfwEbeRWgbNEkqO";
-    let _ = server.parse_response(client_init, false);
+    let _ = server.parse_response(client_init);
 
     //...
     return Ok(());

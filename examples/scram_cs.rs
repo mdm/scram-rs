@@ -31,7 +31,9 @@ impl ScramAuthServer<ScramSha256> for AuthDB
         Ok(ScramPassword::found_secret_base64_password(
             "xeR41ZKIyEGqUw22hFxMjZYok6ABzk4RpJY4c6qYE0o=".to_string(),
                 "c2FsdA==".to_string(), 
-                unsafe { NonZeroU32::new_unchecked(4096) })?);
+                unsafe { NonZeroU32::new_unchecked(4096) },
+            None
+        )?);
 
                 
     }
@@ -41,6 +43,7 @@ struct AuthClient
 {
     username: String,
     password: String,
+    key: scram_rs::ScramKey,
 }
 
 impl ScramAuthClient for AuthClient
@@ -54,6 +57,11 @@ impl ScramAuthClient for AuthClient
     {
         return &self.password;
     }
+
+    fn get_scram_keys(&self) -> &scram_rs::ScramKey 
+    {
+        return &self.key;
+    }
 }
 
 impl AuthClient
@@ -61,7 +69,7 @@ impl AuthClient
     pub 
     fn new(u: &'static str, p: &'static str) -> Self
     {
-        return AuthClient{ username: u.to_string(), password: p.to_string() };
+        return AuthClient{ username: u.to_string(), password: p.to_string(), key: scram_rs::ScramKey::new() };
     }
 }
 
@@ -78,11 +86,11 @@ pub fn main() -> ScramResult<()>
     let mut client =
         SyncScramClient::<ScramSha256, AuthClient>::new(&client, ScramNonce::None, scram_rs::ClientChannelBindingType::None).unwrap();
 
-    let ci = client.init_client(true);
-    let si = server.parse_response_base64(&ci).unwrap().extract_output().unwrap();
+    let ci = client.init_client().encode_output_base64().unwrap();
+    let si = server.parse_response_base64(&ci).unwrap().encode_base64();
 
-    let ci1 = client.parse_response_base64(&si).unwrap().extract_output().unwrap();
-    let si1 = server.parse_response_base64(&ci1).unwrap().extract_output().unwrap();
+    let ci1 = client.parse_response_base64(&si).unwrap().encode_output_base64().unwrap();
+    let si1 = server.parse_response_base64(&ci1).unwrap().encode_base64();
 
     if client.parse_response_base64(&si1).unwrap().is_final() == true
     {

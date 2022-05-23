@@ -59,6 +59,9 @@ pub enum ScramErrorCode
 
     /// Error due to protocol violation
     ProtocolViolation,
+
+    /// Wrong call on extract result
+    AuthSeqCompleted
 }
 
 impl fmt::Display for ScramErrorCode 
@@ -67,12 +70,13 @@ impl fmt::Display for ScramErrorCode
     {
         match *self 
         {
-            Self::InternalError => write!(f, "Internal Server Error"),
+            Self::InternalError     => write!(f, "Internal Server Error"),
             Self::VerificationError => write!(f, "Data Verification Error"),
-            Self::ExternalError => write!(f, "External Server Error"),
+            Self::ExternalError     => write!(f, "External Server Error"),
             Self::MalformedScramMsg => write!(f, "Malformed Scram Message"),
             Self::FeatureNotSupported => write!(f, "Feature is not supported"),
             Self::ProtocolViolation => write!(f, "Protocol Violation"),
+            Self::AuthSeqCompleted  => write!(f, "Completed!"),
         }
     }
 }
