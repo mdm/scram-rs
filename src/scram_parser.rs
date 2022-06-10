@@ -13,8 +13,11 @@ use std::str;
 use std::str::Chars;
 use std::iter::Peekable;
 
+use crate::ScramCommon;
+use crate::ScramServerError;
+
 use super::scram_error::{ScramResult, ScramErrorCode};
-use super::{scram_error, scram_error_map};
+use super::{scram_error, scram_error_map, scram_ierror};
 use super::scram_cb::ServerChannelBindType;
 use super::scram_state::ScramState;
 
@@ -53,7 +56,7 @@ pub(crate) enum ScramData<'par>
         finalnonce: &'par str,
         /// "p=" base64 (proof)
         proof: &'par str,
-        ///stored client_nonce
+        /// stored client_nonce
         client_nonce: &'par String,
     },
 
@@ -98,19 +101,18 @@ impl<'par> ScramDataParser<'par>
     fn from_raw(resp: &'par str, scramstate: &'par ScramState) -> ScramResult<ScramData<'par>>
     {
         let mut c = resp.chars().peekable();
-        let cur: Option<char>;
 
         // skip all \d\a
-        match c.next()
-        {
-            Some(r) =>
+
+        let cur: Option<char> = 
+            match c.next()
             {
-                cur = Some(r);
-            },
-            None => scram_error!(ScramErrorCode::MalformedScramMsg, 
-                                "state: '{}', unexpected EOF while parsing", scramstate),
-        }            
-        
+                Some(r) => Some(r),
+                None => 
+                    scram_error!(ScramErrorCode::MalformedScramMsg, ScramServerError::OtherError,
+                        "state: '{}', unexpected EOF while parsing", scramstate),
+            };       
+            
 
         let mut inst = 
             ScramDataParser
@@ -125,24 +127,23 @@ impl<'par> ScramDataParser<'par>
             match scramstate
             {
                 ScramState::WaitForClientInitalMsg =>
-                {
-                    inst.parsing_client_init_msg()?
-                },
+                    inst.parsing_client_init_msg()?,
+
                 ScramState::WaitForServInitMsg =>
-                {
-                    inst.parsing_server_init_reply()?
-                },
+                    inst.parsing_server_init_reply()?,
+
                 ScramState::WaitForClientFinalMsg{client_nonce} =>
-                {
-                    inst.parsing_clinet_final_msg(client_nonce)?
-                },
+                    inst.parsing_clinet_final_msg(client_nonce)?,
+
                 ScramState::WaitForServFinalMsg{server_signature} =>
-                {
-                    inst.parsing_server_final_reply(server_signature)?
-                },
-                _ => scram_error!(ScramErrorCode::InternalError,
-                                "state {} not implemented \
-                                or does not require handling", scramstate),
+                    inst.parsing_server_final_reply(server_signature)?,
+
+                _ => 
+                    scram_error!(
+                        ScramErrorCode::InternalError,
+                        ScramServerError::OtherError,
+                        "state {} not implemented or does not require handling", scramstate
+                    ),
             };
          
         return Ok(res);
@@ -161,8 +162,9 @@ impl<'par> ScramDataParser<'par>
             {
                 scram_error!(
                     ScramErrorCode::MalformedScramMsg,
+                    ScramServerError::OtherError,
                     "malformed scram message, expected ASCII char but found char: {} near position: {}", 
-                    ScramDataParser::sanitize_char(*x),
+                    ScramCommon::sanitize_char(*x),
                     self.pos
                 );
             }
@@ -182,9 +184,11 @@ impl<'par> ScramDataParser<'par>
     {
         match self.curchar
         {
-            Some(r) => return Ok(r),
+            Some(r) => 
+                return Ok(r),
             None => 
-                scram_error!(ScramErrorCode::MalformedScramMsg, "Unexpected eof at {}", self.pos),
+                scram_error!(ScramErrorCode::MalformedScramMsg, ScramServerError::OtherError,
+                    "Unexpected eof at {}", self.pos),
         }
     }
 
@@ -192,7 +196,8 @@ impl<'par> ScramDataParser<'par>
     #[inline]
     fn foresee_char(&mut self) -> Option<char>
     {
-        return match self.chars.peek()
+        return 
+            match self.chars.peek()
             {
                 Some(c) => Some(*c),
                 None => None
@@ -202,11 +207,13 @@ impl<'par> ScramDataParser<'par>
     #[inline]
     fn foresee_char_e(&mut self) -> ScramResult<char>
     {
-        return match self.chars.peek()
+        return 
+            match self.chars.peek()
             {
                 Some(c) => Ok(*c),
                 None => 
-                    scram_error!(ScramErrorCode::MalformedScramMsg, "Unexpected eof at {}", self.pos),
+                    scram_error!(ScramErrorCode::MalformedScramMsg, ScramServerError::OtherError,
+                        "Unexpected eof at {}", self.pos),
             };
     }
 
@@ -217,7 +224,8 @@ impl<'par> ScramDataParser<'par>
             match self.get_cur_char()
             {
                 None => 
-                    scram_error!(ScramErrorCode::MalformedScramMsg, "parameter '{}' was not found", par),
+                    scram_error!(ScramErrorCode::MalformedScramMsg, ScramServerError::OtherError,
+                        "parameter '{}' was not found", par),
                 Some(c) =>
                 {
                     let pardata = self.read_parameter(c)?;
@@ -236,9 +244,10 @@ impl<'par> ScramDataParser<'par>
         {
             scram_error!(
                 ScramErrorCode::MalformedScramMsg,
+                ScramServerError::OtherError,
                 "expected paramenter '{}' but found char: '{}' near position: '{}'", 
                 par,
-                ScramDataParser::sanitize_char(self.get_cur_char_e()?),
+                ScramCommon::sanitize_char(self.get_cur_char_e()?),
                 self.pos
             );
         }
@@ -249,8 +258,9 @@ impl<'par> ScramDataParser<'par>
         {
             scram_error!(
                 ScramErrorCode::MalformedScramMsg,
+                ScramServerError::OtherError,
                 "expected '=' but found char: '{}' near position: '{}'", 
-                ScramDataParser::sanitize_char(self.get_cur_char_e()?),
+                ScramCommon::sanitize_char(self.get_cur_char_e()?),
                 self.pos
             );
         }
@@ -280,6 +290,7 @@ impl<'par> ScramDataParser<'par>
         let ret = &self.srcmsg[initpos..self.pos];
         
         self.move_next()?;
+
         return Ok(ret);
     }
 
@@ -298,48 +309,94 @@ impl<'par> ScramDataParser<'par>
     /// r=rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0,s=W22ZaJ0SNY7soEsUEjb6gQ==,i=4096
     fn parsing_server_init_reply(&mut self) -> ScramResult<ScramData<'par>>
     {
+        // it is not clear if this is part of the RFC but this lib demonstrates such tricks,
+        // in case of internal error.
+        if self.get_cur_char_e()? == 'e'
+        {
+            let err_type = self.read_parameter('e')?;
+            let cerr_type = ScramServerError::from(err_type);
+
+            scram_error!(ScramErrorCode::ClientSide, cerr_type, "{}", cerr_type);
+        }
 
         let nonce = self.read_parameter('r')?;
 
         // check if nonce is printable
         ScramDataParser::q_scram_printable(&nonce)?;
 
-        let ret = ScramData::SmsgInitial
+        let salt = 
+            base64::decode(self.read_parameter('s')?)
+            .map_err(|e| 
+                scram_error_map!(
+                    ScramErrorCode::MalformedScramMsg, 
+                    ScramServerError::InvalidEncoding,
+                    "parameter s= conversion err, {}", e
+                )
+            )?;
+
+        let itrcnt = 
+            i32::from_str_radix(self.read_parameter('i')?, 10)
+                .map_err(|e| 
+                    scram_error_map!(
+                        ScramErrorCode::MalformedScramMsg, 
+                        ScramServerError::OtherError,
+                        "parameter i= conversion err, {}", e
+                    )
+                )?;
+
+        if itrcnt < 0
+        {
+            scram_error!(ScramErrorCode::MalformedScramMsg, ScramServerError::OtherError, 
+                "parameter i= '{}' is negative!", itrcnt);
+        }
+
+        let ret = 
+            ScramData::SmsgInitial
             {
                 nonce: nonce,
-                salt: base64::decode(self.read_parameter('s')?)
-                        .map_err(|e| 
-                            scram_error_map!(
-                                ScramErrorCode::MalformedScramMsg, 
-                                "parameter v= conversion err, {}", e
-                            )
-                        )?,
-                itrcnt: u32::from_str_radix(self.read_parameter('i')?, 10)
-                        .map_err(|e| 
-                            scram_error_map!(
-                                ScramErrorCode::MalformedScramMsg, 
-                                "parameter i= conversion err, {}", e
-                            )
-                        )?,
+                salt: salt,
+                itrcnt: itrcnt as u32
             };
 
         return Ok(ret);
     }
 
-    /// v=6rriTRBi23WpRR/wtup+mMhUZUn/dB5nLTJRsjl95G4=
+    /// v=6rriTRBi23WpRR/wtup+mMhUZUn/dB5nLTJRsjl95G4= / e=invalid-proof
     fn parsing_server_final_reply(&mut self, server_verifier: &'par Vec<u8>) -> ScramResult<ScramData<'par>>
     {
-        let ret = 
-            ScramData::SmsgFinalMessage
+        let par = self.get_cur_char_e()?;
+        match par
+        {
+            'v' => 
             {
-                verifier: base64::decode(self.read_parameter('v')?)
-                            .map_err(|e| 
-                                scram_error_map!(ScramErrorCode::MalformedScramMsg, "parameter v= conversion err, {}", e)
-                            )?,
-                server_verifier: server_verifier,
-            };
+                let ret = 
+                    ScramData::SmsgFinalMessage
+                    {
+                        verifier: 
+                            base64::decode(self.read_parameter('v')?)
+                                .map_err(|e| 
+                                    scram_error_map!(ScramErrorCode::MalformedScramMsg, ScramServerError::InvalidEncoding,
+                                        "parameter v= conversion err, {}", e)
+                                )?,
+                        server_verifier: server_verifier,
+                    };
 
-        return Ok(ret);
+                return Ok(ret);
+            },
+            'e' =>
+            {
+                let err_type = self.read_parameter('e')?;
+                let cerr_type = ScramServerError::from(err_type);
+
+                scram_error!(ScramErrorCode::ClientSide, cerr_type, "{}", cerr_type);
+            },
+            _ =>
+            {
+                scram_ierror!(ScramErrorCode::MalformedScramMsg, 
+                    "final reply contains unknown parameter '{}'", ScramCommon::sanitize_char(par));
+            }
+        }
+        
     }
 
     fn parsing_client_init_msg(&mut self) -> ScramResult<ScramData<'par>>
@@ -358,8 +415,9 @@ impl<'par> ScramDataParser<'par>
                     {
                         scram_error!(
                             ScramErrorCode::MalformedScramMsg,
+                            ScramServerError::OtherError,
                             "expected ',' but found char: {} near position: {}", 
-                            ScramDataParser::sanitize_char(self.foresee_char_e()?),
+                            ScramCommon::sanitize_char(self.foresee_char_e()?),
                             self.pos
                         );
                     }
@@ -377,8 +435,9 @@ impl<'par> ScramDataParser<'par>
                     {
                         scram_error!(
                             ScramErrorCode::MalformedScramMsg,
+                            ScramServerError::OtherError,
                             "expected ',' but found char: '{}' near position: '{}'", 
-                            ScramDataParser::sanitize_char(self.get_cur_char_e()?),
+                            ScramCommon::sanitize_char(self.get_cur_char_e()?),
                             self.pos
                         );
                     }
@@ -399,8 +458,9 @@ impl<'par> ScramDataParser<'par>
                 {
                     scram_error!(
                         ScramErrorCode::MalformedScramMsg,
+                        ScramServerError::OtherError,
                         "expected 'n,|y,|p=' but found char: '{}' near position: '{}'", 
-                        ScramDataParser::sanitize_char(self.get_cur_char_e()?),
+                        ScramCommon::sanitize_char(self.get_cur_char_e()?),
                         self.pos
                     );
                 },
@@ -415,14 +475,16 @@ impl<'par> ScramDataParser<'par>
             'a' => 
                 scram_error!(
                     ScramErrorCode::FeatureNotSupported, 
+                    ScramServerError::OtherError,
                     "client uses authorization identity (a=), but it is not supported!"
                 ),
             ',' => self.move_next()?,
             _ => 
                 scram_error!(
                     ScramErrorCode::MalformedScramMsg, 
+                    ScramServerError::OtherError,
                     "expected '=' but found char: '{}' near position: '{}'", 
-                    ScramDataParser::sanitize_char(self.get_cur_char_e()?),
+                    ScramCommon::sanitize_char(self.get_cur_char_e()?),
                     self.pos
                 ),
         }
@@ -431,15 +493,19 @@ impl<'par> ScramDataParser<'par>
         {
             scram_error!(
                 ScramErrorCode::FeatureNotSupported, 
+                ScramServerError::ExtensionsNotSupported,
                 "client requires an unsupported SCRAM extension! (m=)"
             );
         }
 
+        // if previosly the provided raw data for parsing was converted to
+        // str with utf8 validation, it should be UTF8 safe
         let username = self.read_parameter('n')?;
         let nonce = self.read_parameter('r')?;
 
         // check if nonce is printable
-        ScramDataParser::q_scram_printable(&nonce)?;
+        ScramDataParser::q_scram_printable(nonce)?;
+        ScramDataParser::u_scram_printable(username)?;
 
         // any left data is ignored
         
@@ -483,6 +549,7 @@ impl<'par> ScramDataParser<'par>
         {
             scram_error!(
                 ScramErrorCode::InternalError,
+                ScramServerError::OtherError,
                 "xor arrays size mismatch: a: '{}', b: '{}'", a.len(), b.len()
             );
         }
@@ -503,22 +570,26 @@ impl<'par> ScramDataParser<'par>
             // p < 0x21 || p > 0x7E
             if p.is_ascii_graphic() == false || p.is_ascii() == false || p == ','
             {
-                scram_error!(ScramErrorCode::MalformedScramMsg, "non-printable characters in SCRAM nonce");
+                scram_error!(ScramErrorCode::MalformedScramMsg, ScramServerError::OtherError,
+                    "non-printable characters in SCRAM nonce");
             }
         }
 
         return Ok(());
     }
 
-    fn sanitize_char(c: char) -> String
+    fn u_scram_printable(u: &'par str) -> ScramResult<()>
     {
-        if c.is_ascii_graphic() == true
+        for p in u.chars()
         {
-            return c.to_string();
+            // any character that can be printed except control chars
+            if p.is_control() == true || p.is_ascii_whitespace() == true || p.is_ascii_control() == true
+            {
+                scram_error!(ScramErrorCode::MalformedScramMsg, ScramServerError::InvalidUsernameEncoding,
+                    "non-printable characters in SCRAM username: {}", ScramCommon::sanitize_str_unicode(u));
+            }
         }
-        else
-        {
-            return format!("{:#x}", c as u64);
-        }
+
+        return Ok(());
     }
 }

@@ -1,12 +1,10 @@
 
 use std::num::NonZeroU32;
 
-use std::sync::mpsc::channel;
-use std::thread;
-
 use scram_rs::ScramAuthClient;
 use scram_rs::ScramKey;
 use scram_rs::ScramResult;
+use scram_rs::ScramResultClient;
 use scram_rs::ScramSha256;
 use scram_rs::ScramNonce;
 use scram_rs::ScramPassword;
@@ -29,21 +27,26 @@ impl AuthDB
 
 impl ScramAuthServer<ScramSha256> for AuthDB
 {
-    fn get_password_for_user(&self, _username: &str) -> ScramResult<ScramPassword>
+    fn get_password_for_user(&self, username: &str) -> ScramResult<ScramPassword>
     {
-        let mut sk = ScramKey::new();
-        sk.set_server_key(b"testkey123456".to_vec());
-        sk.set_client_key(b"keytest123456".to_vec());
-        
         return 
-            Ok(ScramPassword::found_secret_base64_password(
-                "xeR41ZKIyEGqUw22hFxMjZYok6ABzk4RpJY4c6qYE0o=".to_string(),
-                    "c2FsdA==".to_string(), 
-                    unsafe { NonZeroU32::new_unchecked(4096) },
-                Some(sk)
-            )?);
+            if username == "user"
+            {
+                let mut sk = ScramKey::new();
+                    sk.set_server_key(b"testkey123456".to_vec());
+                    sk.set_client_key(b"keytest123456".to_vec());
 
-                
+                Ok(ScramPassword::found_secret_base64_password(
+                    "xeR41ZKIyEGqUw22hFxMjZYok6ABzk4RpJY4c6qYE0o=".to_string(),
+                        "c2FsdA==".to_string(), 
+                        unsafe { NonZeroU32::new_unchecked(4096) },
+                    Some(sk)
+                )?)
+            }
+            else 
+            {
+                ScramPassword::not_found::<ScramSha256>()
+            };         
     }
 }
 
@@ -85,69 +88,77 @@ impl AuthClient
     }
 }
 
-/// This example will not run, because it requires server, see tests in scram_sync.rs
-pub fn main() -> ScramResult<()>
+pub fn main()
 {
+    let client = AuthClient::new("user", "password");
     
-    let authdb = AuthDB::new();
-    let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
+    let (clie_send, serv_recv) = std::sync::mpsc::channel::<String>();
+    let (serv_send, clie_recv) = std::sync::mpsc::channel::<String>();
 
-    let mut server = 
-        SyncScramServer::<ScramSha256, AuthDB>::new(&authdb, None, ScramNonce::none(), scramtype).unwrap();
-
-    
-    let (client_send, server_recv) = channel::<String>();
-    let (server_send, client_recv) = channel::<String>();
-
-    // spawn client
-    let thr = 
-        thread::spawn(move || 
+    let hndl = 
+        std::thread::spawn(move || 
             {
-                let client_auth = AuthClient::new("user", "password");
-
-                let mut client =
-                    SyncScramClient::<ScramSha256, AuthClient>::new(&client_auth, ScramNonce::None, scram_rs::ClientChannelBindingType::None).unwrap();
-
-
-                let ci = client.init_client().encode_output_base64().unwrap();
-                client_send.send(ci).unwrap();
-
+                let authdb = AuthDB::new();
+                let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
+            
+                let mut server = 
+                    SyncScramServer::<ScramSha256, AuthDB>::new(&authdb, None, ScramNonce::none(), scramtype).unwrap();
+            
                 loop
                 {
-                    let rcv = client_recv.recv().unwrap();
+                    let client_data = serv_recv.recv().unwrap();
 
-                    let ci1 = client.parse_response_base64(&rcv).unwrap();
+                    let serv_data = server.parse_response_base64(client_data);
+                    serv_send.send(serv_data.encode_base64()).unwrap();
 
-                    if ci1.is_final() == true
+                    match serv_data
                     {
-                        println!("auth success, CLIENT");
-                        
-
-                        return;
-                    }
-                    else
-                    {
-                        client_send.send(ci1.encode_output_base64().unwrap()).unwrap();
+                        scram_rs::ScramResultServer::Error(e) => 
+                        {
+                            println!("server: error: {}", e);
+                            break;
+                        },
+                        scram_rs::ScramResultServer::Final(_) =>
+                        {
+                            println!("server: final!");
+                            break;
+                        },
+                        _ => {}
                     }
                 }
             }
         );
 
+    let mut client =
+        SyncScramClient::<ScramSha256, AuthClient>::new(&client, ScramNonce::None, scram_rs::ClientChannelBindingType::None).unwrap();
+
+    // client sends initial message: cli -> serv
+    let ci = client.init_client().encode_output_base64().unwrap();
+    clie_send.send(ci).unwrap();
+
+    
     loop
     {
-        let rcv = server_recv.recv().unwrap();
+        let serv_data = clie_recv.recv().unwrap();
 
-        let si = server.parse_response_base64(&rcv).unwrap();
-
-        server_send.send(si.encode_base64()).unwrap();
-
-        if si.is_completed() == true
+        match client.parse_response_base64(serv_data)
         {
-            println!("auth success, SERVER");
-
-            thr.join().unwrap();
-
-            return Ok(());
+            Ok(ScramResultClient::Completed) => 
+            {
+                println!("client: completed auth successfully");
+                break;
+            },
+            Ok(out) => clie_send.send(out.encode_output_base64().unwrap()).unwrap(),
+            Err(e) =>
+            {
+                println!("client: error: {}", e);
+                break;
+            }
         }
+
     }
+
+    hndl.join().unwrap();
+
+    return;
 }

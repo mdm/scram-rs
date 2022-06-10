@@ -13,6 +13,8 @@ use std::num::NonZeroU32;
 
 use getrandom::getrandom;
 
+use crate::{ScramServerError};
+
 use super::scram_error::{ScramResult, ScramErrorCode};
 use super::{scram_error, scram_error_map};
 
@@ -70,6 +72,8 @@ impl ScramCommon
     /// Default HMAC iterations
     pub const SCRAM_DEFAULT_SALT_ITER: NonZeroU32 = unsafe { NonZeroU32::new_unchecked(4096) };
 
+    pub const SCRAM_MAX_ITERS: u32 = 999999999;
+
     /// Generates random secuence of bytes
     /// 
     /// # Arguments
@@ -85,7 +89,9 @@ impl ScramCommon
         let mut data = Vec::<u8>::with_capacity(len);
         
         getrandom(&mut data)
-            .map_err(|e| scram_error_map!(ScramErrorCode::ExternalError, "getrandom err, {}", e))?;
+            .map_err(|e| 
+                scram_error_map!(ScramErrorCode::ExternalError, ScramServerError::OtherError, "scram getrandom err, {}", e)
+            )?;
 
         return Ok(data);
     }
@@ -128,7 +134,8 @@ impl ScramCommon
             }
         }
 
-        scram_error!(ScramErrorCode::ExternalError, "unknown scram type: {}", scram_name);
+        scram_error!(ScramErrorCode::ExternalError, ScramServerError::OtherError, 
+            "unknown scram type: {}", scram_name);
     }
 
     /// Retrieves the SCRAM type from [SCRAM_TYPES] by the numeric alias which 
@@ -151,7 +158,100 @@ impl ScramCommon
         match SCRAM_TYPES.get(scram_offset)
         {
             Some(r) => return Ok(r),
-            None => scram_error!(ScramErrorCode::ExternalError, "unknown scram type: {:?}", scram)
+            None => scram_error!(ScramErrorCode::ExternalError, ScramServerError::OtherError,
+                "unknown scram type: {:?}", scram)
         }
     }
+}
+
+impl ScramCommon
+{
+    pub(crate)
+    fn sanitize_char(c: char) -> String
+    {
+        if c.is_ascii_graphic() == true
+        {
+            return c.to_string();
+        }
+        else
+        {
+            let mut buf = [0_u8; 4];
+                c.encode_utf8(&mut buf);
+
+            let formatted: String = 
+                buf[0..c.len_utf8()].into_iter()
+                    .map(|c| format!("\\x{:02x}", c))
+                    .collect();
+
+            return formatted;
+        }
+    }
+
+    pub(crate)
+    fn sanitize_str(st: &str) -> String
+    {
+        let mut out = String::with_capacity(st.len());
+
+        for c in st.chars()
+        {
+            if c.is_ascii_alphanumeric() == true ||
+                c.is_ascii_punctuation() == true ||
+                c == ' '
+            {
+                out.push(c);
+            }
+            else
+            {
+                let mut buf = [0_u8; 4];
+                c.encode_utf8(&mut buf);
+
+                let formatted: String = 
+                    buf[0..c.len_utf8()].into_iter()
+                        .map(|c| format!("\\x{:02x}", c))
+                        .collect();
+
+                out.push_str(&formatted);
+            }
+        }
+
+        return out;
+    }
+
+    pub(crate)
+    fn sanitize_str_unicode(st: &str) -> String
+    {
+        let mut out = String::with_capacity(st.len());
+
+        for c in st.chars()
+        {
+            if c.is_alphanumeric() == true ||
+                c.is_ascii_punctuation() == true ||
+                c == ' '
+            {
+                out.push(c);
+            }
+            else
+            {
+                let mut buf = [0_u8; 4];
+                c.encode_utf8(&mut buf);
+
+                let formatted: String = 
+                    buf[0..c.len_utf8()].into_iter()
+                        .map(|c| format!("\\x{:02x}", c))
+                        .collect();
+
+                out.push_str(&formatted);
+            }
+        }
+
+        return out;
+    }
+}
+
+#[test]
+fn sanitize_unicode()
+{
+    let res = ScramCommon::sanitize_str_unicode("る\n\0bp234");
+
+    assert_eq!(res.as_str(), "る\\x0a\\x00bp234");
 }

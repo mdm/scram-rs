@@ -11,8 +11,9 @@
 
 use std::mem;
 
+use crate::{scram_ierror, ScramRuntimeError};
+
 use super::scram_error::{ScramResult, ScramErrorCode};
-use super::{scram_error};
 use super::scram_common::ScramCommon;
 
 pub use super::scram_sync;
@@ -23,38 +24,78 @@ pub use super::scram_async;
 ///  state. The timeout and other things must be implemented separatly.
 ///  The state from internal state machine is not exposed. If needed can
 ///  be maintained separatly.
+/// 
+/// A [ScramResultServer::Error] indicates an error i.e internal, protocol
+///     violation or other. If the user program does not maintain its own
+///     signalling (i.e encapsulation or error reporting like postgresql)
+///     then the error message can be extracted and sent. The error will be
+///     handled by the scram library.
 #[derive(Debug)]
-pub struct ScramResultServer
-{   
-    /// A response to send (raw)
-    pub raw_out: String,
-
-    /// If set to true, the last response is generated and auth
-    ///  completes.
-    pub completed: bool,
+pub enum ScramResultServer
+{
+    /// A data to send back
+    Data(String),
+    /// - Error during processing. Use the same method `encode_base64` to
+    ///  extract message and send back to client.
+    /// - Authentification error which will be indicated as `VerificationError`.
+    Error(ScramRuntimeError),
+    /// A final message to send and continue, auth was successfull.
+    Final(String)
 }
 
 impl ScramResultServer
 {
-    /// Tells if auth seq completed.
+    /// Tells if result does not contain error.
     pub 
-    fn is_completed(&self) -> bool
+    fn is_ok(&self) -> bool
     {
-        return self.completed;
+        match *self
+        {
+            Self::Error(_) => return false,
+            _ => return true
+        }
     }
+
+    /// Tells if result is error.
+    pub 
+    fn is_err(&self) -> bool
+    {
+        return !self.is_ok();
+    }
+    
+    /// Extracts error.
+    pub 
+    fn err(self) -> Option<ScramRuntimeError>
+    {
+        match self
+        {
+            Self::Error(err) => return Some(err),
+            _ => return None
+        }
+    }   
 
     /// Encodes the raw result to base64.
     pub 
     fn encode_base64(&self) -> String
     {
-        return base64::encode(&self.raw_out);
+        match *self
+        {
+            Self::Data(ref raw_data) =>  base64::encode(raw_data),
+            Self::Error(ref err) => base64::encode(err.serv_err_value()),
+            Self::Final(ref raw_data) => base64::encode(raw_data),
+        }
     }
 
     /// Returns the ref [str] to raw output.
     pub 
     fn get_raw_output(&self) -> &str
     {
-        return self.raw_out.as_str();
+        match *self
+        {
+            Self::Data(ref raw_data) =>  raw_data.as_str(),
+            Self::Error(ref err) => err.serv_err_value(),
+            Self::Final(ref raw_data) => raw_data.as_str(),
+        }
     }
 }
 
@@ -109,7 +150,7 @@ impl ScramResultClient
             ScramResultClient::Output(output) => 
                 return Ok(output),
             ScramResultClient::Completed => 
-                scram_error!(ScramErrorCode::AuthSeqCompleted, "completed, nothing to extract"),
+                scram_ierror!(ScramErrorCode::AuthSeqCompleted, "completed, nothing to extract"),
         }
     }
 
@@ -130,7 +171,7 @@ impl ScramResultClient
             ScramResultClient::Output(output) => 
                 return Ok(output.as_str()),
             ScramResultClient::Completed => 
-                scram_error!(ScramErrorCode::AuthSeqCompleted, "completed, nothing to extract"),
+                scram_ierror!(ScramErrorCode::AuthSeqCompleted, "completed, nothing to extract"),
         }
     }
 
@@ -150,7 +191,7 @@ impl ScramResultClient
             ScramResultClient::Output(output) => 
                 return Ok(base64::encode(output)),
             ScramResultClient::Completed => 
-                scram_error!(ScramErrorCode::AuthSeqCompleted, "completed, nothing to extract"),
+                scram_ierror!(ScramErrorCode::AuthSeqCompleted, "completed, nothing to extract"),
         }
     }
 }
@@ -212,7 +253,7 @@ impl<'sn> ScramNonce<'sn>
             {
                 if p.len() > ScramCommon::SCRAM_RAW_NONCE_LEN
                 {
-                    scram_error!(
+                    scram_ierror!(
                         ScramErrorCode::InternalError,
                         "nonce length is > {}, actual: '{}'", 
                         ScramCommon::SCRAM_RAW_NONCE_LEN, p.len()
@@ -225,7 +266,7 @@ impl<'sn> ScramNonce<'sn>
             {
                 if b.len() == 0
                 {
-                    scram_error!(ScramErrorCode::InternalError, "base64 nonce length is 0");
+                    scram_ierror!(ScramErrorCode::InternalError, "base64 nonce length is 0");
                 }
                 
                 return Ok(b.to_string())

@@ -12,7 +12,7 @@ use std::num::NonZeroU32;
 
 use async_trait::async_trait;
 
-use crate::{scram_error_map, ScramErrorCode};
+use crate::{scram_error_map, ScramErrorCode, ScramServerError};
 
 use super::scram_error::{ScramResult};
 
@@ -293,14 +293,17 @@ impl ScramPassword
         scram_keys_opt: Option<ScramKey>
     ) -> ScramResult<Self>
     {
+        let shp = 
+            base64::decode(salted_hashed_password)
+                .map_err(|e| 
+                    scram_error_map!(ScramErrorCode::ExternalError, ScramServerError::OtherError,
+                        "can not decode salted and hashed password in [found_secret_base64_password], {}", e)
+                )?;
+
         return Ok(
             Self::UserPasswordData
             {
-                salted_hashed_password: 
-                    base64::decode(salted_hashed_password)
-                        .map_err(|e| 
-                            scram_error_map!(ScramErrorCode::ExternalError, "base64 decode error, {}", e)
-                        )?,
+                salted_hashed_password: shp,
                 salt_b64: salt_base64,
                 iterations: iterations,
                 scram_keys: scram_keys_opt.unwrap_or(ScramKey::new()),

@@ -62,9 +62,14 @@ impl ScramHashing for ScramSha1
     #[cfg(feature = "use_default")]
     fn hmac(data: &[u8], key: &[u8]) -> ScramResult<Vec<u8>> 
     {
+        use crate::ScramServerError;
+
         let mut mac = 
             Hmac::<Sha1>::new_from_slice(key)
-                .map_err(|e| scram_error_map!(ScramErrorCode::ExternalError, "hmac() HmacSha1 err, {}", e))?;
+                .map_err(|e| 
+                    scram_error_map!(ScramErrorCode::ExternalError, ScramServerError::OtherError,
+                        "hmac() HmacSha1 err, {}", e)
+                )?;
 
         mac.update(data);
         
@@ -130,9 +135,14 @@ impl ScramHashing for ScramSha256
     #[cfg(feature = "use_default")]
     fn hmac(data: &[u8], key: &[u8]) -> ScramResult<Vec<u8>> 
     {
+        use crate::ScramServerError;
+
         let mut mac = 
             Hmac::<Sha256>::new_from_slice(key)
-                .map_err(|e| scram_error_map!(ScramErrorCode::ExternalError, "hmac() Hmac::<Sha256> err, {}", e))?;
+                .map_err(|e| 
+                    scram_error_map!(ScramErrorCode::ExternalError, ScramServerError::OtherError,
+                        "hmac() Hmac::<Sha256> err, {}", e)
+                )?;
 
         mac.update(data);
 
@@ -201,9 +211,14 @@ impl ScramHashing for ScramSha512
     #[cfg(feature = "use_default")]
     fn hmac(data: &[u8], key: &[u8]) -> ScramResult<Vec<u8>> 
     {
+        use crate::ScramServerError;
+
         let mut mac = 
             Hmac::<Sha512>::new_from_slice(key)
-                .map_err(|e| scram_error_map!(ScramErrorCode::ExternalError, "hmac() Hmac::<Sha512> err, {}", e))?;
+                .map_err(|e| 
+                    scram_error_map!(ScramErrorCode::ExternalError, ScramServerError::OtherError, 
+                        "hmac() Hmac::<Sha512> err, {}", e)
+                )?;
 
         mac.update(data);
         

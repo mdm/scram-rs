@@ -41,7 +41,7 @@ impl ScramAuthServer<ScramSha256> for AuthDB
             else 
             {
                 ScramPassword::not_found::<ScramSha256>()
-            };      
+            };  
     }
 }
 
@@ -82,7 +82,7 @@ impl AuthClient
 /// This example will not run, because it requires server, see tests in scram_sync.rs
 pub fn main()
 {
-    let client = AuthClient::new("user", "password");
+    let client = AuthClient::new("user0", "password");
     
     let (clie_send, serv_recv) = std::sync::mpsc::channel::<String>();
     let (serv_send, clie_recv) = std::sync::mpsc::channel::<String>();

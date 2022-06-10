@@ -1,6 +1,6 @@
 # Scram-rs
 
-v 0.5
+v 0.6
 
 A SCRAM-SHA1, SCRAM-SHA256, SCRAM-SHA512 SCRAM-SHA256-PLUS client and server.  
 
@@ -14,6 +14,7 @@ A SCRAM-SHA1, SCRAM-SHA256, SCRAM-SHA512 SCRAM-SHA256-PLUS client and server.
 - a partial support of async which allows to integrate it in async code
   or use with async
 - Client/Server key (custom)
+- Error handling `server-error` RFC5802 (`e=server-error-value`)
 
 ## Does not support:
 - authzid (a=)

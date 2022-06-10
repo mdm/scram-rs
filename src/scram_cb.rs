@@ -10,6 +10,8 @@
 
 use std::fmt;
 
+use crate::{ScramServerError, ScramCommon};
+
 use super::scram_common::ScramType;
 use super::scram_error::{ScramResult, ScramErrorCode};
 use super::{scram_error};
@@ -87,6 +89,7 @@ impl ServerChannelBindType
                 Self::TlsUnique => 
                     scram_error!(
                         ScramErrorCode::MalformedScramMsg,
+                        ScramServerError::UnsupportedChannelBindingType,
                         "unsupported SCRAM channel-binding type {}!", 
                         self
                     ),
@@ -96,6 +99,7 @@ impl ServerChannelBindType
                 Self::None => 
                     scram_error!(
                         ScramErrorCode::MalformedScramMsg,
+                        ScramServerError::ChannelBindingsDontMatch,
                         "malformed message, client selected *-PLUS but message does not include cb data!"
                     ),
 
@@ -103,6 +107,7 @@ impl ServerChannelBindType
                 Self::Unsupported => 
                     scram_error!(
                         ScramErrorCode::MalformedScramMsg,
+                        ScramServerError::ChannelBindingsDontMatch,
                         "malformed message, client picked -PLUS, but did not provide cb data"
                     ),
             }
@@ -115,6 +120,7 @@ impl ServerChannelBindType
                 Self::TlsUnique | Self::TlsServerEndpoint{..} => 
                     scram_error!(
                         ScramErrorCode::MalformedScramMsg,
+                        ScramServerError::ChannelBindingsDontMatch,
                         "client provided channel binding data while picking SCRAM without -PLUS extension!"
                     ),
 
@@ -158,17 +164,24 @@ impl ServerChannelBindType
         {
             Self::TlsUnique =>
             {
-                panic!("assertion trap: Tls-uniq is not supported, cb_type: {}, \
-                         scram_type: {}", self, st)
+                scram_error!(
+                    ScramErrorCode::InternalError,
+                    ScramServerError::UnsupportedChannelBindingType,
+                    "ASSERTION: unsupported SCRAM channel-binding type {}!", 
+                    self
+                );
             },
             Self::TlsServerEndpoint =>
             {
                 if st.scram_chan_bind == false
                 {
-                    panic!("assertion trap: cb_type: {}, scram_type: {}, so when is bind==true \
-                            then cb_type must be \
-                            either TlsUnique or TlsServerEndpoint", 
-                            self, st);
+                    scram_error!(
+                        ScramErrorCode::InternalError,
+                        ScramServerError::OtherError,
+                        "assertion trap: cb_type: {}, scram_type: {}, so when is bind==true \
+                            then cb_type must be either TlsUnique or TlsServerEndpoint", 
+                        self, st
+                    );
                 }
 
                 let endp_cert_hash = 
@@ -176,10 +189,13 @@ impl ServerChannelBindType
                     {
                         Some(r) => r,   
                         None => 
-                            panic!(
+                            scram_error!(
+                                ScramErrorCode::InternalError,
+                                ScramServerError::OtherError,
                                 "assertion trap: cb_type: {}, scram_type: {} \
                                 TlsServerEndpoint requires endpoint_hash to be Some(...)", 
-                                self, st)
+                                self, st
+                            ),
                     };
                 //get the data from ChannelBindingData which contains 
                 //hash data of server's SSL certificate and combine it
@@ -198,7 +214,11 @@ impl ServerChannelBindType
                 }
                 else
                 {
-                    scram_error!(ScramErrorCode::VerificationError, "SCRAM channel binding check failed");
+                    scram_error!(
+                        ScramErrorCode::VerificationError, 
+                        ScramServerError::OtherError,
+                        "SCRAM channel binding check failed"
+                    );
                 }
             },
             Self::Unsupported => 
@@ -211,8 +231,9 @@ impl ServerChannelBindType
                 {
                     scram_error!(
                         ScramErrorCode::ProtocolViolation,
+                        ScramServerError::OtherError,
                         "unexpected SCRAM channel-binding attribute in client-final-message: {}", 
-                        cb_attr
+                        ScramCommon::sanitize_str(cb_attr),
                     );
                 }
             },
@@ -226,8 +247,9 @@ impl ServerChannelBindType
                 {
                     scram_error!(
                         ScramErrorCode::ProtocolViolation,
+                        ScramServerError::OtherError,
                         "unexpected SCRAM channel-binding attribute in client-final-message: {}", 
-                        cb_attr
+                        ScramCommon::sanitize_str(cb_attr),
                     );
                 }
             }
@@ -240,11 +262,17 @@ impl ServerChannelBindType
     {
         match cb.as_ref()
         {
-            "none" => return Ok(Self::None),
-            "unsupported" => return Ok(Self::Unsupported),
-            "tls-unique" => return Ok(Self::TlsUnique),
-            "tls-server-end-point" => return Ok(Self::TlsServerEndpoint),
-            _ => scram_error!(ScramErrorCode::ProtocolViolation, "Unknown channel bind type: '{}'", cb.as_ref()),
+            "none" => 
+                return Ok(Self::None),
+            "unsupported" => 
+                return Ok(Self::Unsupported),
+            "tls-unique" => 
+                return Ok(Self::TlsUnique),
+            "tls-server-end-point" => 
+                return Ok(Self::TlsServerEndpoint),
+            _ => 
+                scram_error!(ScramErrorCode::ProtocolViolation, ScramServerError::ChannelBindingNotSupported, 
+                    "Unknown channel bind type: '{}'", cb.as_ref()),
         }
     }
 
@@ -327,10 +355,7 @@ impl ClientChannelBindingType
             Self::None => return b"",
             Self::Unsupported => return b"",
             //Self::TlsUnique => panic!("not supported yet"),
-            Self::TlsServerEndpoint{ref cb_data} => 
-            {
-                cb_data
-            }
+            Self::TlsServerEndpoint{ref cb_data} => return cb_data
         }
     }
 }
