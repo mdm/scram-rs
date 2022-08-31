@@ -12,6 +12,8 @@ use crate::scram_ierror;
 /// * TLS exporter data
 /// 
 /// By defualt each function returns error: [ScramErrorCode::ChanBindNotImplemented]
+/// 
+/// Functions must return a raw data retreived form your TLS library.
 pub trait ScramCbHelper
 {
     /// This function returns (on success) a TLS endpoint cert data.

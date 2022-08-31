@@ -78,6 +78,9 @@ impl<'ss, S: ScramHashing, A: ScramAuthServer<S>, B: ScramCbHelper> SyncScramSer
     /// 
     /// * `data_chanbind` - A channel binding data TLS Endpoint Cert Hash
     /// 
+    /// * `chan_bind_helper` - An implemented trait [ScramCbHelper] which should provide 
+    ///                 crate with all necessary data for channel bind.
+    /// 
     /// * `scram_nonce` - A Scram Nonce type
     /// 
     /// * `st` - A type of the scram picked by name from table [super::scram_common::SCRAM_TYPES]
@@ -393,8 +396,8 @@ impl<'sc, S: ScramHashing, A: ScramAuthClient, B: ScramCbHelper> SyncScramClient
     ///                     responsibility of the developer to correctly set the chan binding
     ///                     type.
     /// 
-    /// * `chan_bind_helper` - a data type which implements a traint [ScramCbHelperClient] which
-    ///                 contains the function for realization which are designed to provide the
+    /// * `chan_bind_helper` - a data type which implements a traint [ScramCbHelper] which
+    ///                 contains functions for realization which are designed to provide the
     ///                 channel bind data to the `SCRAM` crate.
     /// 
     /// # Examples
