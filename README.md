@@ -1,16 +1,16 @@
 # Scram-rs
 
-v 0.6
+v 0.7
 
-A SCRAM-SHA1, SCRAM-SHA256, SCRAM-SHA512 SCRAM-SHA256-PLUS client and server.  
+A SCRAM-SHA1, SCRAM-SHA256, SCRAM-SHA512, SCRAM-SHA512-PLUS, SCRAM-SHA256-PLUS client and server.  
 
 ## Supports:  
 - SHA-1 hasher
 - SHA-256 hasher (tested with Postfix Dovecot SASL)
 - SHA-512 hasher
 - Client/Server sync
-- Server Channel Binding TLS-Server-Endpoint 256, 512 untested
-- Client Channel Binding TLS-Server-Endpoint 256, 512 untested
+- Server Channel Binding 256, 512 untested (user must implement the trait to provide necessary data)
+- Client Channel Binding 256, 512 untested
 - a partial support of async which allows to integrate it in async code
   or use with async
 - Client/Server key (custom)
@@ -45,16 +45,16 @@ see ./examples/
 
 | iteration | use_default | use_ring |
 |-----------|-------------|----------|
-| 1         | 152.30ms    | 16.96ms  |
-| 2         | 143.78ms    | 16.52ms  |
-| 3         | 144.70ms    | 16.04ms  |
+| 1         | 98.02ms     | 16.96ms  |
+| 2         | 98.69ms     | 16.52ms  |
+| 3         | 95.27ms     | 16.04ms  |
 
 
 ### scram_sha256_works() async tests (DEBUG)
 
 | iteration | use_default | use_ring |
 |-----------|-------------|----------|
-| 1         | 143.68ms    | 16.15ms  |
-| 2         | 143.66ms    | 15.98ms  |
-| 3         | 144.40ms    | 17.12ms  |
+| 1         | 97.66ms     | 16.15ms  |
+| 2         | 100.65ms    | 15.98ms  |
+| 3         | 100.05ms    | 17.12ms  |
 

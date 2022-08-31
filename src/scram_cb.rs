@@ -10,14 +10,15 @@
 
 use std::fmt;
 
-use crate::{ScramServerError, ScramCommon};
+use crate::scram_cbh::{ScramCbHelper, AsyncScramCbHelper};
+use crate::{ScramServerError};
 
 use super::scram_common::ScramType;
 use super::scram_error::{ScramResult, ScramErrorCode};
 use super::{scram_error};
 
 /// A channel binding type picked by client.
-pub(crate) enum ServerChannelBindType
+pub enum ChannelBindType
 {
     /// No channel binding data.
     None,
@@ -26,10 +27,12 @@ pub(crate) enum ServerChannelBindType
     /// p=tls-unique channel binding data.
     TlsUnique,
     /// p=tls-server-end-point
-    TlsServerEndpoint
+    TlsServerEndpoint,
+    /// p=tls-exporter
+    TlsExporter,
 }
 
-impl fmt::Display for ServerChannelBindType
+impl fmt::Display for ChannelBindType
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result 
     {
@@ -39,11 +42,12 @@ impl fmt::Display for ServerChannelBindType
             Self::Unsupported => write!(f, "Unsupported"),
             Self::TlsUnique => write!(f, "TlsUnique"),
             Self::TlsServerEndpoint => write!(f, "TlsServerEndpoint"),
+            Self::TlsExporter => write!(f, "TlsExporter"),
         }
     }
 }
 
-impl ServerChannelBindType
+impl ChannelBindType
 {
     /// Initializes enum as n,,
     pub 
@@ -60,14 +64,67 @@ impl ServerChannelBindType
     }
 
     /// Initializes enum as p=tls-server-end-point
-    #[allow(dead_code)]
     pub 
     fn tls_server_endpoint() -> Self
     {
         return Self::TlsServerEndpoint;
     }
 
-    /// Verifies the client initial request about the Channel Bind
+    /// Initializes enum as p=tls-unique
+    pub 
+    fn tls_unique() -> Self
+    {
+        return Self::TlsUnique;
+    }
+
+    /// Initializes p=tls-exporter
+    pub 
+    fn tls_exporter() -> Self
+    {
+        return Self::TlsExporter;
+    }
+
+    /// Converts the enum [ChannelBindType] to protocol header text 
+    pub 
+    fn convert2header(&self) -> &str
+    {
+        match self
+        {
+            Self::None => return "n,,",
+            Self::Unsupported => return "y,,",
+            Self::TlsUnique => "p=tls-unique,,",
+            Self::TlsServerEndpoint => "p=tls-server-end-point,,",
+            Self::TlsExporter => "p=tls-exporter,,",
+        }
+    }
+ 
+    pub 
+    fn get_cb_data_raw(&self, sbh: &dyn ScramCbHelper) -> ScramResult<Vec<u8>>
+    {
+        match self
+        {
+            Self::None => return Ok(b"".to_vec()),
+            Self::Unsupported => return Ok(b"".to_vec()),
+            Self::TlsUnique => sbh.get_tls_unique(),
+            Self::TlsServerEndpoint => sbh.get_tls_server_endpoint(),
+            Self::TlsExporter => sbh.get_tls_exporter(),
+        }
+    }
+
+    pub async 
+    fn async_get_cb_data_raw(&self, sbh: &dyn AsyncScramCbHelper) -> ScramResult<Vec<u8>>
+    {
+        match self
+        {
+            Self::None => return Ok(b"".to_vec()),
+            Self::Unsupported => return Ok(b"".to_vec()),
+            Self::TlsUnique => sbh.get_tls_unique().await,
+            Self::TlsServerEndpoint => sbh.get_tls_server_endpoint().await,
+            Self::TlsExporter => sbh.get_tls_exporter().await,
+        }
+    }
+
+    /// Verifies the client initial request of the Channel Bind type
     /// If client picks SCRAM-? without -PLUS extension, then it should not
     /// require any channel binding i.e n -(None) or y-(Unsupported)
     /// 
@@ -86,21 +143,17 @@ impl ServerChannelBindType
             // server with channel binding support
             match *self
             {
-                Self::TlsUnique => 
-                    scram_error!(
-                        ScramErrorCode::MalformedScramMsg,
-                        ScramServerError::UnsupportedChannelBindingType,
-                        "unsupported SCRAM channel-binding type {}!", 
-                        self
-                    ),
+                Self::TlsUnique => return Ok(()),
 
-                Self::TlsServerEndpoint{..} => return Ok(()),
+                Self::TlsServerEndpoint => return Ok(()),
+
+                Self::TlsExporter => return Ok(()),
 
                 Self::None => 
                     scram_error!(
                         ScramErrorCode::MalformedScramMsg,
                         ScramServerError::ChannelBindingsDontMatch,
-                        "malformed message, client selected *-PLUS but message does not include cb data!"
+                        "malformed message, client selected *-PLUS but message did not include cb data!"
                     ),
 
                 //if client pickes -PLUS and sends y(Unsupported) then this is malformed message
@@ -117,7 +170,7 @@ impl ServerChannelBindType
             // -PLUS was not picked
             match *self
             {
-                Self::TlsUnique | Self::TlsServerEndpoint{..} => 
+                Self::TlsUnique | Self::TlsServerEndpoint | Self::TlsExporter => 
                     scram_error!(
                         ScramErrorCode::MalformedScramMsg,
                         ScramServerError::ChannelBindingsDontMatch,
@@ -148,10 +201,10 @@ impl ServerChannelBindType
     /// * [ScramResult] nothing in payload or error
     pub 
     fn server_final_verify_client_cb(
-        &mut self, 
+        &self, 
         st: &ScramType, 
         cb_attr: &str,
-        endpoint_hash: Option<&std::vec::Vec<u8>>
+        sbh: &dyn ScramCbHelper,
     ) -> ScramResult<()>
     {
         // verify input
@@ -160,99 +213,327 @@ impl ServerChannelBindType
         // which is "y,,".  We also have to check whether the flag is the same
         // one that the client originally sent. auth-scram_8c_source.c:1310
 
-        match *self
-        {
-            Self::TlsUnique =>
+        let comp_cb_attr = 
+            match *self
             {
-                scram_error!(
-                    ScramErrorCode::InternalError,
-                    ScramServerError::UnsupportedChannelBindingType,
-                    "ASSERTION: unsupported SCRAM channel-binding type {}!", 
-                    self
-                );
-            },
-            Self::TlsServerEndpoint =>
-            {
-                if st.scram_chan_bind == false
+                Self::TlsExporter => 
                 {
-                    scram_error!(
-                        ScramErrorCode::InternalError,
-                        ScramServerError::OtherError,
-                        "assertion trap: cb_type: {}, scram_type: {}, so when is bind==true \
-                            then cb_type must be either TlsUnique or TlsServerEndpoint", 
-                        self, st
-                    );
-                }
-
-                let endp_cert_hash = 
-                    match endpoint_hash
+                    if st.scram_chan_bind == false
                     {
-                        Some(r) => r,   
-                        None => 
-                            scram_error!(
-                                ScramErrorCode::InternalError,
-                                ScramServerError::OtherError,
-                                "assertion trap: cb_type: {}, scram_type: {} \
-                                TlsServerEndpoint requires endpoint_hash to be Some(...)", 
-                                self, st
-                            ),
-                    };
-                //get the data from ChannelBindingData which contains 
-                //hash data of server's SSL certificate and combine it
-                let header = 
-                    [
-                        "p=tls-server-end-point,,".as_bytes(),
-                        endp_cert_hash,
-                        //cbind_data
-                    ].concat();
-                
-                let bheader = base64::encode(header);
+                        scram_error!(
+                            ScramErrorCode::InternalError,
+                            ScramServerError::OtherError,
+                            "assertion trap: cb_type: {}, scram_type: {}, does not \
+                                include SCRAM channel binding",
+                            self, st
+                        );
+                    }
 
-                if bheader.as_str() == cb_attr
+                    let expt_tls = 
+                        match sbh.get_tls_exporter()
+                        {
+                            Ok(r) => r,   
+                            Err(e) => 
+                                scram_error!(
+                                    ScramErrorCode::InternalError,
+                                    ScramServerError::OtherError,
+                                    "assertion trap: cb_type: {}, scram_type: {} \
+                                    TlsExporter requires endpoint data from TLS connection! \
+                                    Error returned: '{}'", 
+                                    self, st, e
+                                ),
+                        };
+
+                    let header = 
+                        [
+                            self.convert2header().as_bytes(), //"p=tls-server-end-point,,".as_bytes(),
+                            expt_tls.as_slice(),
+                            //cbind_data
+                        ].concat();
+                    
+                    let bheader = base64::encode(header);
+                    
+                    bheader
+                },
+                Self::TlsUnique =>
                 {
-                    return Ok(());
-                }
-                else
+                    if st.scram_chan_bind == false
+                    {
+                        scram_error!(
+                            ScramErrorCode::InternalError,
+                            ScramServerError::OtherError,
+                            "assertion trap: cb_type: {}, scram_type: {}, does not \
+                                include SCRAM channel binding",
+                            self, st
+                        );
+                    }
+
+                    let uniq_tls = 
+                        match sbh.get_tls_unique()
+                        {
+                            Ok(r) => r,   
+                            Err(e) => 
+                                scram_error!(
+                                    ScramErrorCode::InternalError,
+                                    ScramServerError::OtherError,
+                                    "assertion trap: cb_type: {}, scram_type: {} \
+                                    TlsUnique requires endpoint data from TLS connection! \
+                                    Error returned: '{}'", 
+                                    self, st, e
+                                ),
+                        };
+
+                    let header = 
+                        [
+                            self.convert2header().as_bytes(), //"p=tls-server-end-point,,".as_bytes(),
+                            uniq_tls.as_slice(),
+                            //cbind_data
+                        ].concat();
+                    
+                    let bheader = base64::encode(header);
+                    
+                    bheader
+                },
+                Self::TlsServerEndpoint =>
                 {
-                    scram_error!(
-                        ScramErrorCode::VerificationError, 
-                        ScramServerError::OtherError,
-                        "SCRAM channel binding check failed"
-                    );
+                    if st.scram_chan_bind == false
+                    {
+                        scram_error!(
+                            ScramErrorCode::InternalError,
+                            ScramServerError::OtherError,
+                            "assertion trap: cb_type: {}, scram_type: {}, does not \
+                                include SCRAM channel binding",
+                            self, st
+                        );
+                    }
+
+                    let endp_cert_hash = 
+                        match sbh.get_tls_server_endpoint()
+                        {
+                            Ok(r) => r,   
+                            Err(e) => 
+                                scram_error!(
+                                    ScramErrorCode::InternalError,
+                                    ScramServerError::OtherError,
+                                    "assertion trap: cb_type: {}, scram_type: {} \
+                                    TlsServerEndpoint requires endpoint data from TLS connection! \
+                                    Error returned: '{}'", 
+                                    self, st, e
+                                ),
+                        };
+
+                    //get the data from ChannelBindingData which contains 
+                    //hash data of server's SSL certificate and combine it
+                    let header = 
+                        [
+                            self.convert2header().as_bytes(), //"p=tls-server-end-point,,".as_bytes(),
+                            endp_cert_hash.as_slice(),
+                            //cbind_data
+                        ].concat();
+                    
+                    let bheader = base64::encode(header);
+
+
+                    bheader
+                },
+                Self::Unsupported => 
+                {
+                    "eSws".to_string()
+                },
+                Self::None =>
+                {
+                    "biws".to_string()
                 }
-            },
-            Self::Unsupported => 
+            };
+
+        if comp_cb_attr.as_str() == cb_attr
+        {
+            return Ok(());
+        }
+        else
+        {
+            scram_error!(
+                ScramErrorCode::VerificationError, 
+                ScramServerError::OtherError,
+                "SCRAM channel binding '{}' check failed! Scram type: {}",
+                self, st
+            );
+        }
+    }
+
+    /// Server uses this function to verify the the client channel bind
+    /// in final message.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `st` - [ScramType] a current scram type
+    /// 
+    /// * `cb_attr` - a received channel binding data from client in base64 format
+    /// 
+    /// * `endpoint_hash` - a servers TLS end point certificate
+    /// 
+    /// # Returns
+    /// 
+    /// * [ScramResult] nothing in payload or error
+    pub async 
+    fn async_server_final_verify_client_cb(
+        &self, 
+        st: &ScramType, 
+        cb_attr: &str,
+        sbh: &(dyn AsyncScramCbHelper + Sync),
+    ) -> ScramResult<()>
+    {
+        // verify input
+        // If we are not using channel binding, the binding data is expected
+        // to always be "biws", which is "n,," base64-encoded, or "eSws",
+        // which is "y,,".  We also have to check whether the flag is the same
+        // one that the client originally sent. auth-scram_8c_source.c:1310
+
+        let comp_cb_attr = 
+            match *self
             {
-                if cb_attr == "eSws"
+                Self::TlsExporter => 
                 {
-                    return Ok(());
-                }
-                else
+                    if st.scram_chan_bind == false
+                    {
+                        scram_error!(
+                            ScramErrorCode::InternalError,
+                            ScramServerError::OtherError,
+                            "assertion trap: cb_type: {}, scram_type: {}, does not \
+                                include SCRAM channel binding",
+                            self, st
+                        );
+                    }
+
+                    let expt_tls = 
+                        match sbh.get_tls_exporter().await
+                        {
+                            Ok(r) => r,   
+                            Err(e) => 
+                                scram_error!(
+                                    ScramErrorCode::InternalError,
+                                    ScramServerError::OtherError,
+                                    "assertion trap: cb_type: {}, scram_type: {} \
+                                    TlsExporter requires endpoint data from TLS connection! \
+                                    Error returned: '{}'", 
+                                    self, st, e
+                                ),
+                        };
+
+                    let header = 
+                        [
+                            self.convert2header().as_bytes(), //"p=tls-server-end-point,,".as_bytes(),
+                            expt_tls.as_slice(),
+                            //cbind_data
+                        ].concat();
+                    
+                    let bheader = base64::encode(header);
+                    
+                    bheader
+                },
+                Self::TlsUnique =>
                 {
-                    scram_error!(
-                        ScramErrorCode::ProtocolViolation,
-                        ScramServerError::OtherError,
-                        "unexpected SCRAM channel-binding attribute in client-final-message: {}", 
-                        ScramCommon::sanitize_str(cb_attr),
-                    );
-                }
-            },
-            Self::None =>
-            {
-                if cb_attr == "biws"
+                    if st.scram_chan_bind == false
+                    {
+                        scram_error!(
+                            ScramErrorCode::InternalError,
+                            ScramServerError::OtherError,
+                            "assertion trap: cb_type: {}, scram_type: {}, does not \
+                                include SCRAM channel binding",
+                            self, st
+                        );
+                    }
+
+                    let uniq_tls = 
+                        match sbh.get_tls_unique().await
+                        {
+                            Ok(r) => r,   
+                            Err(e) => 
+                                scram_error!(
+                                    ScramErrorCode::InternalError,
+                                    ScramServerError::OtherError,
+                                    "assertion trap: cb_type: {}, scram_type: {} \
+                                    TlsUnique requires endpoint data from TLS connection! \
+                                    Error returned: '{}'", 
+                                    self, st, e
+                                ),
+                        };
+
+                    let header = 
+                        [
+                            self.convert2header().as_bytes(), //"p=tls-server-end-point,,".as_bytes(),
+                            uniq_tls.as_slice(),
+                            //cbind_data
+                        ].concat();
+                    
+                    let bheader = base64::encode(header);
+                    
+                    bheader
+                },
+                Self::TlsServerEndpoint =>
                 {
-                    return Ok(());
-                }
-                else
+                    if st.scram_chan_bind == false
+                    {
+                        scram_error!(
+                            ScramErrorCode::InternalError,
+                            ScramServerError::OtherError,
+                            "assertion trap: cb_type: {}, scram_type: {}, does not \
+                                include SCRAM channel binding",
+                            self, st
+                        );
+                    }
+
+                    let endp_cert_hash = 
+                        match sbh.get_tls_server_endpoint().await
+                        {
+                            Ok(r) => r,   
+                            Err(e) => 
+                                scram_error!(
+                                    ScramErrorCode::InternalError,
+                                    ScramServerError::OtherError,
+                                    "assertion trap: cb_type: {}, scram_type: {} \
+                                    TlsServerEndpoint requires endpoint data from TLS connection! \
+                                    Error returned: '{}'", 
+                                    self, st, e
+                                ),
+                        };
+
+                    //get the data from ChannelBindingData which contains 
+                    //hash data of server's SSL certificate and combine it
+                    let header = 
+                        [
+                            self.convert2header().as_bytes(), //"p=tls-server-end-point,,".as_bytes(),
+                            endp_cert_hash.as_slice(),
+                            //cbind_data
+                        ].concat();
+                    
+                    let bheader = base64::encode(header);
+
+
+                    bheader
+                },
+                Self::Unsupported => 
                 {
-                    scram_error!(
-                        ScramErrorCode::ProtocolViolation,
-                        ScramServerError::OtherError,
-                        "unexpected SCRAM channel-binding attribute in client-final-message: {}", 
-                        ScramCommon::sanitize_str(cb_attr),
-                    );
+                    "eSws".to_string()
+                },
+                Self::None =>
+                {
+                    "biws".to_string()
                 }
-            }
+            };
+
+        if comp_cb_attr.as_str() == cb_attr
+        {
+            return Ok(());
+        }
+        else
+        {
+            scram_error!(
+                ScramErrorCode::VerificationError, 
+                ScramServerError::OtherError,
+                "SCRAM channel binding '{}' check failed! Scram type: {}",
+                self, st
+            );
         }
     }
 
@@ -273,89 +554,6 @@ impl ServerChannelBindType
             _ => 
                 scram_error!(ScramErrorCode::ProtocolViolation, ScramServerError::ChannelBindingNotSupported, 
                     "Unknown channel bind type: '{}'", cb.as_ref()),
-        }
-    }
-
-    #[allow(dead_code)]
-    pub 
-    fn convert2header(&self) -> &[u8]
-    {
-        match self
-        {
-            Self::None => return b"n,,",
-            Self::Unsupported => return b"y,,",
-            Self::TlsUnique => panic!("not supported yet"), //"p=tls-unique,,"
-            Self::TlsServerEndpoint{..} => b"p=tls-server-end-point,,"
-        }
-    }
-}
-
-/// Sets the channel bind type
-pub enum ClientChannelBindingType
-{
-    /// No channel binding data.
-    None,
-    /// Advertise that the client does not think the server supports channel binding.
-    Unsupported,
-    /// p=tls-unique channel binding data. Not supported
-    //TlsUnique,
-    /// p=tls-server-end-point
-    TlsServerEndpoint{cb_data: Vec<u8>},
-}
-
-impl fmt::Display for ClientChannelBindingType
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result 
-    {
-        match *self 
-        {
-            Self::None => write!(f, "None"),
-            Self::Unsupported => write!(f, "Unsupported"),
-            //Self::TlsUnique => write!(f, "TlsUnique"),
-            Self::TlsServerEndpoint{..} => write!(f, "TlsServerEndpoint"),
-        }
-    }
-}
-
-impl ClientChannelBindingType
-{
-    /// Initializes enum as No channel binding is required
-    pub 
-    fn without_chan_binding() -> Self
-    {
-        return Self::None;
-    }
-
-    /// Initializes enum as Client picks -PLUS and provides the endpoint cert hash
-    pub 
-    fn with_tls_server_endpoint(cb_data: Vec<u8>) -> Self
-    {
-        return Self::TlsServerEndpoint{cb_data: cb_data};
-    }
-
-    /// Converts the [ClientChannelBindingType] to protocol header text 
-    pub 
-    fn convert2header(&self) -> &str
-    {
-        match self
-        {
-            Self::None => return "n,,",
-            Self::Unsupported => return "y,,",
-            //Self::TlsUnique => panic!("not supported yet"), //"p=tls-unique,,"
-            Self::TlsServerEndpoint{..} => "p=tls-server-end-point,,"
-        }
-    }
-
-    // Extracts from the [ClientChannelBindingType] the stored data
-    pub 
-    fn convert2data(&self) -> &[u8]
-    {
-        match *self
-        {
-            Self::None => return b"",
-            Self::Unsupported => return b"",
-            //Self::TlsUnique => panic!("not supported yet"),
-            Self::TlsServerEndpoint{ref cb_data} => return cb_data
         }
     }
 }

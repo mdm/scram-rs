@@ -12,11 +12,12 @@ use std::num::NonZeroU32;
 use std::str;
 use std::marker::PhantomData;
 
+use crate::scram_cbh::ScramCbHelper;
 use crate::{ScramResultServer, scram_ierror, ScramServerError, scram_ierror_map};
 
 use super::scram_error::{ScramResult, ScramErrorCode};
 use super::{scram_error, scram_error_map};
-use super::scram_cb::{ServerChannelBindType, ClientChannelBindingType};
+use super::scram_cb::ChannelBindType;
 use super::scram_auth::{ScramPassword, ScramAuthServer, ScramAuthClient};
 use super::scram_hashing::ScramHashing;
 use super::scram_common::{ScramType, ScramCommon};
@@ -37,7 +38,7 @@ use super::scram::{ScramNonce, ScramResultClient};
 /// If client picks SCRAM-SHA-<any>-PLUS then the developer should 
 ///     also provide the data_chanbind argument with the server
 ///     certificate endpoint i.e native_tls::TlsStream::tls_server_end_point()  
-pub struct SyncScramServer<'ss, S: ScramHashing, A: ScramAuthServer<S>>
+pub struct SyncScramServer<'ss, S: ScramHashing, A: ScramAuthServer<S>, B: ScramCbHelper>
 {
     /// The hasher which will be used: SHA-1 SHA-256
     hasher: PhantomData<S>,
@@ -54,12 +55,12 @@ pub struct SyncScramServer<'ss, S: ScramHashing, A: ScramAuthServer<S>>
     /// Current scrum state
     state: ScramState,
     /// Received channel binding opt from client
-    cli_chanbind: ServerChannelBindType,
-    /// TLS server-endpoint certificate hash
-    data_chanbind: Option<Vec<u8>>
+    cli_chanbind: ChannelBindType,
+    /// A callback to support channel bind mechanism
+    chanbind_helper: &'ss B,
 }
 
-impl<'ss, S: ScramHashing, A: ScramAuthServer<S>> SyncScramServer<'ss, S, A>
+impl<'ss, S: ScramHashing, A: ScramAuthServer<S>, B: ScramCbHelper> SyncScramServer<'ss, S, A, B>
 {
     /// Returns the supported types in format SCRAM SCRAM SCRAM
     pub 
@@ -87,24 +88,16 @@ impl<'ss, S: ScramHashing, A: ScramAuthServer<S>> SyncScramServer<'ss, S, A>
     /// let nonce = ScramNonce::Base64(server_nonce);
     ///
     /// let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
-    /// let scram_res = ScramServer::<ScramSha256, AuthServer>::new(&serv, None, nonce, scramtype);
+    /// let scram_res = ScramServer::<ScramSha256, AuthServer, AuthServer>::new(&serv, &serv, nonce, scramtype);
     /// ```
     pub 
     fn new(
         scram_auth_serv: &'ss A,
-        data_chanbind: Option<Vec<u8>>, 
+        chan_bind_helper: &'ss B,
         scram_nonce: ScramNonce, 
         st: &'ss ScramType
-    ) -> ScramResult<SyncScramServer<'ss, S, A>>
+    ) -> ScramResult<SyncScramServer<'ss, S, A, B>>
     {
-        if st.scram_chan_bind == true && data_chanbind.is_none() == true
-        {
-            scram_ierror!(
-                ScramErrorCode::ExternalError,
-                "scram: '{}' requires the data_chanbind to be set",
-                st
-            );
-        }
 
         let res = 
             Self
@@ -116,8 +109,8 @@ impl<'ss, S: ScramHashing, A: ScramAuthServer<S>> SyncScramServer<'ss, S, A>
                 sp: ScramPassword::default(),
                 server_nonce: scram_nonce.get_nonce()?,
                 state: ScramState::WaitForClientInitalMsg,
-                cli_chanbind: ServerChannelBindType::n(),
-                data_chanbind: data_chanbind,
+                cli_chanbind: ChannelBindType::n(),
+                chanbind_helper: chan_bind_helper,
             };
 
         return Ok(res);
@@ -268,7 +261,7 @@ impl<'ss, S: ScramHashing, A: ScramAuthServer<S>> SyncScramServer<'ss, S, A>
                     .server_final_verify_client_cb(
                         self.st, 
                         chanbinding,
-                        self.data_chanbind.as_ref()
+                        self.chanbind_helper
                     )?;
 
                 let nonce = 
@@ -370,7 +363,7 @@ impl<'ss, S: ScramHashing, A: ScramAuthServer<S>> SyncScramServer<'ss, S, A>
 /// If a developer which to use a channel bind then developer should find
 ///     out how to extract endpoint certificate from his TLS connection.
 ///     i.e native_tls::TlsStream::tls_server_end_point()  
-pub struct SyncScramClient<'sc, S: ScramHashing, A: ScramAuthClient>
+pub struct SyncScramClient<'sc, S: ScramHashing, A: ScramAuthClient, B: ScramCbHelper>
 {
     /// A hasher picked
     hasher: PhantomData<S>,
@@ -380,11 +373,13 @@ pub struct SyncScramClient<'sc, S: ScramHashing, A: ScramAuthClient>
     client_nonce: String,
     /// A current state step
     state: ScramState,
-    /// A type of the channel bind [ClientChannelBindingType]
-    chanbind: ClientChannelBindingType,
+    /// A type of the channel bind [ChannelBindType]
+    chanbind: ChannelBindType,
+    /// A callback to support channel bind mechanism
+    chanbind_helper: &'sc B,
 }
 
-impl<'sc, S: ScramHashing, A: ScramAuthClient> SyncScramClient<'sc, S, A>
+impl<'sc, S: ScramHashing, A: ScramAuthClient, B: ScramCbHelper> SyncScramClient<'sc, S, A, B>
 {
     /// Creates a new client instance and sets every field to default state
     /// 
@@ -394,26 +389,31 @@ impl<'sc, S: ScramHashing, A: ScramAuthClient> SyncScramClient<'sc, S, A>
     /// 
     /// * `scram_nonce` - a client scram nonce [ScramNonce]
     /// 
-    /// * `chan_bind_type` - picks the channel bound [ClientChannelBindingType]. It is
+    /// * `chan_bind_type` - picks the channel bound [ChannelBindType]. It is
     ///                     responsibility of the developer to correctly set the chan binding
     ///                     type.
+    /// 
+    /// * `chan_bind_helper` - a data type which implements a traint [ScramCbHelperClient] which
+    ///                 contains the function for realization which are designed to provide the
+    ///                 channel bind data to the `SCRAM` crate.
     /// 
     /// # Examples
     /// 
     /// ```
-    /// let cbt = ClientChannelBindingType::without_chan_binding();
+    /// let cbt = ChannelBindType::None;
     ///
     /// let ac = AuthClient::new(username, password);
     /// let nonce = ScramNonce::Plain(&client_nonce_dec);
     ///
-    /// let scram_res = SyncScramClient::<ScramSha256, AuthClient>::new(&ac, nonce, cbt);
+    /// let scram_res = SyncScramClient::<ScramSha256, AuthClient, AuthClient>::new(&ac, nonce, cbt, &ac);
     /// ```
     pub 
     fn new(
         scram_auth_cli: &'sc A, 
         scram_nonce: ScramNonce, 
-        chan_bind_type: ClientChannelBindingType
-    ) -> ScramResult<SyncScramClient<'sc, S, A>>
+        chan_bind_type: ChannelBindType,
+        chan_bind_helper: &'sc B,
+    ) -> ScramResult<SyncScramClient<'sc, S, A, B>>
     {
         return Ok(
             Self
@@ -423,6 +423,7 @@ impl<'sc, S: ScramHashing, A: ScramAuthClient> SyncScramClient<'sc, S, A>
                 client_nonce: scram_nonce.get_nonce()?,
                 state: ScramState::InitClient,
                 chanbind: chan_bind_type,
+                chanbind_helper: chan_bind_helper,
             }
         );
     }
@@ -538,7 +539,7 @@ impl<'sc, S: ScramHashing, A: ScramAuthClient> SyncScramClient<'sc, S, A>
                     base64::encode(
                         [
                             self.chanbind.convert2header().as_bytes(), 
-                            self.chanbind.convert2data()
+                            self.chanbind.get_cb_data_raw(self.chanbind_helper)?.as_slice(),
                         ].concat()
                     );
 
@@ -635,6 +636,11 @@ fn scram_sha256_server()
         }
     }
 
+    impl ScramCbHelper for AuthServer
+    {
+        
+    }
+
     impl AuthServer
     {
         pub fn new() -> Self
@@ -662,7 +668,7 @@ fn scram_sha256_server()
    
     let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
     let scram_res = 
-        SyncScramServer::<ScramSha256, AuthServer>::new(&serv, None, nonce, scramtype);
+        SyncScramServer::<ScramSha256, AuthServer, AuthServer>::new(&serv, &serv, nonce, scramtype);
     assert_eq!(scram_res.is_ok(), true);
 
     let mut scram = scram_res.unwrap();
@@ -723,6 +729,11 @@ fn scram_sha256_works()
         }
     }
 
+    impl ScramCbHelper for AuthClient
+    {
+        
+    }
+
     impl AuthClient
     {
         pub fn new(u: &'static str, p: &'static str) -> Self
@@ -744,13 +755,13 @@ fn scram_sha256_works()
     
     let start = Instant::now();
 
-    let cbt = ClientChannelBindingType::without_chan_binding();
+    let cbt = ChannelBindType::None;
 
     let ac = AuthClient::new(username, password);
     let nonce = ScramNonce::Plain(&client_nonce_dec);
 
     let scram_res = 
-        SyncScramClient::<ScramSha256, AuthClient>::new(&ac, nonce, cbt);
+        SyncScramClient::<ScramSha256, AuthClient, AuthClient>::new(&ac, nonce, cbt, &ac);
     assert_eq!(scram_res.is_ok(), true);
 
     let mut scram = scram_res.unwrap();

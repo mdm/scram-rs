@@ -92,12 +92,17 @@ pub mod scram_async;
 pub mod scram_parser;
 pub mod scram_state;
 pub mod scram_sync;
+#[macro_use]
+pub mod scram_cbh;
 
 pub use scram::*;
 pub use scram_auth::*;
 pub use scram_common::*;
-pub use scram_cb::ClientChannelBindingType;
+pub use scram_cb::ChannelBindType;
 pub use scram_hashing::*;
 pub use scram_error::*;
+pub use scram_cbh::*;
 
 pub use async_trait::async_trait;
+
+

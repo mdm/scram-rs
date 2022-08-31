@@ -2,6 +2,7 @@
 use std::num::NonZeroU32;
 
 use scram_rs::ScramAuthClient;
+use scram_rs::ScramCbHelper;
 use scram_rs::ScramKey;
 use scram_rs::ScramResult;
 use scram_rs::ScramResultClient;
@@ -23,6 +24,11 @@ impl AuthDB
     {
         return AuthDB{};
     }
+}
+
+impl ScramCbHelper for AuthDB
+{
+    
 }
 
 impl ScramAuthServer<ScramSha256> for AuthDB
@@ -75,6 +81,11 @@ impl ScramAuthClient for AuthClient
     }
 }
 
+impl ScramCbHelper for AuthClient
+{
+    
+}
+
 impl AuthClient
 {
     pub 
@@ -102,7 +113,7 @@ pub fn main()
                 let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
             
                 let mut server = 
-                    SyncScramServer::<ScramSha256, AuthDB>::new(&authdb, None, ScramNonce::none(), scramtype).unwrap();
+                    SyncScramServer::<ScramSha256, AuthDB, AuthDB>::new(&authdb, &authdb, ScramNonce::none(), scramtype).unwrap();
             
                 loop
                 {
@@ -130,7 +141,7 @@ pub fn main()
         );
 
     let mut client =
-        SyncScramClient::<ScramSha256, AuthClient>::new(&client, ScramNonce::None, scram_rs::ClientChannelBindingType::None).unwrap();
+        SyncScramClient::<ScramSha256, AuthClient, AuthClient>::new(&client, ScramNonce::None, scram_rs::ChannelBindType::None, &client).unwrap();
 
     // client sends initial message: cli -> serv
     let ci = client.init_client().encode_output_base64().unwrap();

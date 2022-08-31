@@ -223,7 +223,10 @@ pub enum ScramErrorCode
     AuthSeqCompleted,
 
     /// Client side received error
-    ClientSide
+    ClientSide,
+
+    /// SCRAM channel binding 'type' not supported or not implemented
+    ChanBindNotImplemented
 }
 
 impl fmt::Display for ScramErrorCode 
@@ -240,6 +243,7 @@ impl fmt::Display for ScramErrorCode
             Self::ProtocolViolation => write!(f, "Protocol Violation"),
             Self::AuthSeqCompleted  => write!(f, "Completed!"),
             Self::ClientSide        => write!(f, "Server reported error"),
+            Self::ChanBindNotImplemented => write!(f, "Channel bind not implemented"),
         }
     }
 }

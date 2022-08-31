@@ -12,11 +12,12 @@ use std::num::NonZeroU32;
 use std::str;
 use std::marker::PhantomData;
 
+use crate::scram_cbh::AsyncScramCbHelper;
 use crate::{ScramResultServer, scram_ierror, ScramServerError, scram_ierror_map};
 
 use super::scram_error::{ScramResult, ScramErrorCode};
 use super::{scram_error, scram_error_map};
-use super::scram_cb::{ServerChannelBindType, ClientChannelBindingType};
+use super::scram_cb::ChannelBindType;
 use super::scram_auth::{ScramPassword, AsyncScramAuthServer, AsyncScramAuthClient};
 use super::scram_hashing::ScramHashing;
 use super::scram_common::{ScramType, ScramCommon};
@@ -36,7 +37,7 @@ use super::scram::{ScramNonce, ScramResultClient};
 /// If client picks SCRAM-SHA-<any>-PLUS then the developer should 
 ///     also provide the data_chanbind argument with the server
 ///     certificate endpoint i.e native_tls::TlsStream::tls_server_end_point()
-pub struct AsyncScramServer<'ss, S: ScramHashing, A: AsyncScramAuthServer<S>>
+pub struct AsyncScramServer<'ss, S: ScramHashing, A: AsyncScramAuthServer<S>, B: AsyncScramCbHelper + Sync>
 {
     /// The hasher which will be used: SHA-1 SHA-256
     hasher: PhantomData<S>,
@@ -53,12 +54,12 @@ pub struct AsyncScramServer<'ss, S: ScramHashing, A: AsyncScramAuthServer<S>>
     /// Current scrum state
     state: ScramState,
     /// Received channel binding opt from client
-    cli_chanbind: ServerChannelBindType,
-    /// TLS server-endpoint certificate hash
-    data_chanbind: Option<Vec<u8>>
+    cli_chanbind: ChannelBindType,
+    /// A callback to support channel bind mechanism
+    chanbind_helper: &'ss B,
 }
 
-impl<'ss, S: ScramHashing, A: AsyncScramAuthServer<S>> AsyncScramServer<'ss, S, A>
+impl<'ss, S: ScramHashing, A: AsyncScramAuthServer<S>, B: AsyncScramCbHelper + Sync> AsyncScramServer<'ss, S, A, B>
 {
     /// Returns the supported types in format SCRAM SCRAM SCRAM
     pub 
@@ -86,16 +87,17 @@ impl<'ss, S: ScramHashing, A: AsyncScramAuthServer<S>> AsyncScramServer<'ss, S, 
     /// let nonce = ScramNonce::Base64(server_nonce);
     ///
     /// let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
-    /// let scram_res = AsyncScramServer::<ScramSha256, AuthServer>::new(&serv, None, nonce, scramtype);
+    /// let scram_res = AsyncScramServer::<ScramSha256, AuthServer, AuthServer>::new(&serv, &serv, nonce, scramtype);
     /// ```
     pub 
     fn new(
         scram_auth_serv: &'ss A,
-        data_chanbind: Option<Vec<u8>>, 
+        chan_bind_helper: &'ss B,
         scram_nonce: ScramNonce, 
         st: &'ss ScramType
-    ) -> ScramResult<AsyncScramServer<'ss, S, A>>
+    ) -> ScramResult<AsyncScramServer<'ss, S, A, B>>
     {
+        /*
         if st.scram_chan_bind == true && data_chanbind.is_none() == true
         {
             scram_ierror!(
@@ -104,6 +106,7 @@ impl<'ss, S: ScramHashing, A: AsyncScramAuthServer<S>> AsyncScramServer<'ss, S, 
                 st
             );
         }
+        */
 
         let res = 
             Self
@@ -115,8 +118,8 @@ impl<'ss, S: ScramHashing, A: AsyncScramAuthServer<S>> AsyncScramServer<'ss, S, 
                 sp: ScramPassword::default(),
                 server_nonce: scram_nonce.get_nonce()?,
                 state: ScramState::WaitForClientInitalMsg,
-                cli_chanbind: ServerChannelBindType::n(),
-                data_chanbind: data_chanbind,
+                cli_chanbind: ChannelBindType::n(),
+                chanbind_helper: chan_bind_helper,
             };
 
         return Ok(res);
@@ -264,11 +267,11 @@ impl<'ss, S: ScramHashing, A: AsyncScramAuthServer<S>> AsyncScramServer<'ss, S, 
             ScramData::CmsgFinalMessage{chanbinding, finalnonce, proof, client_nonce} =>
             {
                 // verify channel bind
-                self.cli_chanbind.server_final_verify_client_cb(
+                self.cli_chanbind.async_server_final_verify_client_cb(
                     self.st, 
                     chanbinding,
-                    self.data_chanbind.as_ref()
-                )?;
+                    self.chanbind_helper
+                ).await?;
 
                 let nonce = [client_nonce.as_str(), self.server_nonce.as_str()].concat();
 
@@ -362,7 +365,7 @@ impl<'ss, S: ScramHashing, A: AsyncScramAuthServer<S>> AsyncScramServer<'ss, S, 
 /// If a developer which to use a channel bind then developer should find
 ///     out how to extract endpoint certificate from his TLS connection.
 ///     i.e native_tls::TlsStream::tls_server_end_point()  
-pub struct AsyncScramClient<'sc, S: ScramHashing, A: AsyncScramAuthClient>
+pub struct AsyncScramClient<'sc, S: ScramHashing, A: AsyncScramAuthClient, B: AsyncScramCbHelper>
 {
     /// A hasher picked
     hasher: PhantomData<S>,
@@ -372,11 +375,13 @@ pub struct AsyncScramClient<'sc, S: ScramHashing, A: AsyncScramAuthClient>
     client_nonce: String,
     /// A current state step
     state: ScramState,
-    /// A type of the channel bind [ClientChannelBindingType]
-    chanbind: ClientChannelBindingType,
+    /// A type of the channel bind [ChannelBindType]
+    chanbind: ChannelBindType,
+    /// A callback to support channel bind mechanism
+    chanbind_helper: &'sc B,
 }
 
-impl<'sc, S: ScramHashing, A: AsyncScramAuthClient> AsyncScramClient<'sc, S, A>
+impl<'sc, S: ScramHashing, A: AsyncScramAuthClient, B: AsyncScramCbHelper> AsyncScramClient<'sc, S, A, B>
 {
     /// Creates a new client instance and sets every field to default state
     /// 
@@ -390,22 +395,27 @@ impl<'sc, S: ScramHashing, A: AsyncScramAuthClient> AsyncScramClient<'sc, S, A>
     ///                     responsibility of the developer to correctly set the chan binding
     ///                     type.
     /// 
+    /// * `chan_bind_helper` - a data type which implements a traint [AsyncScramCbHelperClient] which
+    ///                 contains the function for realization which are designed to provide the
+    ///                 channel bind data to the `SCRAM` crate.
+    /// 
     /// # Examples
     /// 
     /// ```
-    /// let cbt = ClientChannelBindingType::without_chan_binding();
+    /// let cbt = ChannelBindType::None;
     ///
     /// let ac = AuthClient::new(username, password);
     /// let nonce = ScramNonce::Plain(&client_nonce_dec);
     ///
-    /// let scram_res = AsyncScramClient::<ScramSha256, AuthClient>::new(&ac, nonce, cbt);
+    /// let scram_res = AsyncScramClient::<ScramSha256, AuthClient, AuthClient>::new(&ac, nonce, cbt, &ac);
     /// ```
     pub 
     fn new(
         scram_auth_cli: &'sc A, 
         scram_nonce: ScramNonce, 
-        chan_bind_type: ClientChannelBindingType
-    ) -> ScramResult<AsyncScramClient<'sc, S, A>>
+        chan_bind_type: ChannelBindType,
+        chan_bind_helper: &'sc B
+    ) -> ScramResult<AsyncScramClient<'sc, S, A, B>>
     {
         return Ok(
             Self
@@ -415,6 +425,7 @@ impl<'sc, S: ScramHashing, A: AsyncScramAuthClient> AsyncScramClient<'sc, S, A>
                 client_nonce: scram_nonce.get_nonce()?,
                 state: ScramState::InitClient,
                 chanbind: chan_bind_type,
+                chanbind_helper: chan_bind_helper,
             }
         );
     }
@@ -533,7 +544,7 @@ impl<'sc, S: ScramHashing, A: AsyncScramAuthClient> AsyncScramClient<'sc, S, A>
                     base64::encode(
                         [
                             self.chanbind.convert2header().as_bytes(), 
-                            self.chanbind.convert2data()
+                            self.chanbind.async_get_cb_data_raw(self.chanbind_helper).await?.as_slice(),
                         ].concat()
                     );
 
@@ -637,6 +648,27 @@ fn scram_sha256_server()
         }
     }
 
+    #[async_trait]
+    impl AsyncScramCbHelper for AuthServer
+    {
+        async 
+        fn get_tls_server_endpoint(&self) -> ScramResult<Vec<u8>> 
+        {
+            crate::HELPER_UNSUP_SERVER!("endpoint");
+        }
+
+        async 
+        fn get_tls_unique(&self) -> ScramResult<Vec<u8>> {
+            crate::HELPER_UNSUP_SERVER!("unique");
+        }
+
+        async 
+        fn get_tls_exporter(&self) -> ScramResult<Vec<u8>> 
+        {
+            crate::HELPER_UNSUP_SERVER!("exporter");
+        }
+    }
+
     impl AuthServer
     {
         pub fn new() -> Self
@@ -663,7 +695,7 @@ fn scram_sha256_server()
 
     let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
     let scram_res = 
-        AsyncScramServer::<ScramSha256, AuthServer>::new(&serv, None, nonce, scramtype);
+        AsyncScramServer::<ScramSha256, AuthServer, AuthServer>::new(&serv, &serv, nonce, scramtype);
     assert_eq!(scram_res.is_ok(), true);
 
     let mut scram = scram_res.unwrap();
@@ -729,6 +761,27 @@ fn scram_sha256_works()
         }
     }
 
+    #[async_trait]
+    impl AsyncScramCbHelper for AuthClient
+    {
+        async 
+        fn get_tls_server_endpoint(&self) -> ScramResult<Vec<u8>> 
+        {
+            crate::HELPER_UNSUP_CLIENT!("endpoint");
+        }
+
+        async 
+        fn get_tls_unique(&self) -> ScramResult<Vec<u8>> {
+            crate::HELPER_UNSUP_CLIENT!("unique");
+        }
+
+        async 
+        fn get_tls_exporter(&self) -> ScramResult<Vec<u8>> 
+        {
+            crate::HELPER_UNSUP_CLIENT!("exporter");
+        }
+    }
+
     impl AuthClient
     {
         pub fn new(u: &'static str, p: &'static str) -> Self
@@ -749,13 +802,13 @@ fn scram_sha256_works()
     let server_final = "v=6rriTRBi23WpRR/wtup+mMhUZUn/dB5nLTJRsjl95G4=";
 
 
-    let cbt = ClientChannelBindingType::without_chan_binding();
+    let cbt = ChannelBindType::None;
 
     let ac = AuthClient::new(username, password);
     let nonce = ScramNonce::Plain(&client_nonce_dec);
 
     let scram_res = 
-        AsyncScramClient::<ScramSha256, AuthClient>::new(&ac, nonce, cbt);
+        AsyncScramClient::<ScramSha256, AuthClient, AuthClient>::new(&ac, nonce, cbt, &ac);
     assert_eq!(scram_res.is_ok(), true);
 
     let mut scram = scram_res.unwrap();

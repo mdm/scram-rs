@@ -18,7 +18,7 @@ use crate::ScramServerError;
 
 use super::scram_error::{ScramResult, ScramErrorCode};
 use super::{scram_error, scram_error_map, scram_ierror};
-use super::scram_cb::ServerChannelBindType;
+use super::scram_cb::ChannelBindType;
 use super::scram_state::ScramState;
 
 /// Parsed data storage with lifetime 'par.
@@ -28,7 +28,7 @@ pub(crate) enum ScramData<'par>
     CmsgInitial
     {
         /// n, or y, or p=<val>
-        chan_bind: ServerChannelBindType,
+        chan_bind: ChannelBindType,
         //authid and other is not supported
         /// "n=" saslname
         user: &'par str,
@@ -87,9 +87,9 @@ impl<'par> fmt::Display for ScramData<'par>
 /// A data parser instance with lifetime 'par.
 pub(crate) struct ScramDataParser<'par>
 {
+    pos: usize,
     srcmsg: &'par str,
     chars: Peekable<Chars<'par>>,
-    pos: usize,
     curchar: Option<char>,
 }
 
@@ -424,7 +424,7 @@ impl<'par> ScramDataParser<'par>
 
                     // current n,
 
-                    ServerChannelBindType::n()
+                    ChannelBindType::n()
                 },
                 'y' =>
                 {
@@ -442,7 +442,7 @@ impl<'par> ScramDataParser<'par>
                         );
                     }
 
-                    ServerChannelBindType::y()
+                    ChannelBindType::y()
                 },
                 'p' =>
                 {
@@ -452,7 +452,7 @@ impl<'par> ScramDataParser<'par>
                     let par = self.read_parameter('p')?;
                     //p=..., curchar: ,
 
-                    ServerChannelBindType::from_str(par)?
+                    ChannelBindType::from_str(par)?
                 },
                 _ => 
                 {

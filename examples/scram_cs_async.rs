@@ -3,6 +3,7 @@ use std::num::NonZeroU32;
 
 use scram_rs::AsyncScramAuthClient;
 use scram_rs::AsyncScramAuthServer;
+use scram_rs::AsyncScramCbHelper;
 use scram_rs::ScramResult;
 use scram_rs::ScramResultClient;
 use scram_rs::ScramSha256;
@@ -24,6 +25,29 @@ impl AuthDB
         return AuthDB{};
     }
 }
+
+#[async_trait]
+impl AsyncScramCbHelper for AuthDB
+{
+    async 
+    fn get_tls_server_endpoint(&self) -> ScramResult<Vec<u8>> 
+    {
+        scram_rs::HELPER_UNSUP_SERVER!("endpoint");
+    }
+
+    async 
+    fn get_tls_unique(&self) -> ScramResult<Vec<u8>> {
+        scram_rs::HELPER_UNSUP_SERVER!("unique");
+    }
+
+    async 
+    fn get_tls_exporter(&self) -> ScramResult<Vec<u8>> 
+    {
+        scram_rs::HELPER_UNSUP_SERVER!("exporter");
+    }
+}
+
+
 
 #[async_trait]
 impl AsyncScramAuthServer<ScramSha256> for AuthDB
@@ -56,6 +80,27 @@ struct AuthClient
 }
 
 #[async_trait]
+impl AsyncScramCbHelper for AuthClient
+{
+    async 
+    fn get_tls_server_endpoint(&self) -> ScramResult<Vec<u8>> 
+    {
+        scram_rs::HELPER_UNSUP_CLIENT!("endpoint");
+    }
+
+    async 
+    fn get_tls_unique(&self) -> ScramResult<Vec<u8>> {
+        scram_rs::HELPER_UNSUP_CLIENT!("unique");
+    }
+
+    async 
+    fn get_tls_exporter(&self) -> ScramResult<Vec<u8>> 
+    {
+        scram_rs::HELPER_UNSUP_CLIENT!("exporter");
+    }
+}
+
+#[async_trait]
 impl AsyncScramAuthClient for AuthClient
 {
     async fn get_username(&self) -> &str
@@ -73,6 +118,9 @@ impl AsyncScramAuthClient for AuthClient
         return &self.key;
     }
 }
+
+
+
 
 impl AuthClient
 {
@@ -104,7 +152,7 @@ pub fn main()
                         let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
                     
                         let mut server = 
-                            AsyncScramServer::<ScramSha256, AuthDB>::new(&authdb, None, ScramNonce::none(), scramtype).unwrap();
+                            AsyncScramServer::<ScramSha256, AuthDB, AuthDB>::new(&authdb, &authdb, ScramNonce::none(), scramtype).unwrap();
                     
                         loop
                         {
@@ -132,7 +180,7 @@ pub fn main()
                 );
 
             let mut client =
-                AsyncScramClient::<ScramSha256, AuthClient>::new(&client, ScramNonce::None, scram_rs::ClientChannelBindingType::None).unwrap();
+                AsyncScramClient::<ScramSha256, AuthClient, AuthClient>::new(&client, ScramNonce::None, scram_rs::ChannelBindType::None, &client).unwrap();
 
             // client sends initial message: cli -> serv
             let ci = client.init_client().await.encode_output_base64().unwrap();
