@@ -18,9 +18,10 @@ use crate::{ScramServerError};
 
 use super::scram_common::ScramType;
 use super::scram_error::{ScramResult, ScramErrorCode};
-use super::{scram_error};
+use super::scram_error;
 
 /// A channel binding type picked by client.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum ChannelBindType
 {
     /// No channel binding data.
