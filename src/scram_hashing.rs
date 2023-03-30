@@ -94,8 +94,14 @@ impl ScramHashing for ScramSha1
     #[cfg(feature = "use_default")]
     fn derive(password: &[u8], salt: &[u8], iterations: NonZeroU32) -> ScramResult<Vec<u8>> 
     {
+        use crate::ScramServerError;
+
         let mut result = vec![0; Sha1::output_size()]; //20
-        pbkdf2::<Hmac<Sha1>>(password, salt, iterations.get(), &mut result);
+        pbkdf2::<Hmac<Sha1>>(password, salt, iterations.get(), &mut result)
+            .map_err(|e| 
+                scram_error_map!(ScramErrorCode::ExternalError, ScramServerError::OtherError,
+                    "pbkdf2 Hmac::<Sha1> err, {}", e)
+            )?;
 
         return Ok(result);
     }
@@ -168,9 +174,14 @@ impl ScramHashing for ScramSha256
     #[cfg(feature = "use_default")]
     fn derive(password: &[u8], salt: &[u8], iterations: NonZeroU32) -> ScramResult<Vec<u8>> 
     {
+        use crate::ScramServerError;
 
         let mut salted = vec![0; Sha256::output_size()]; // 32
-        pbkdf2::<Hmac<Sha256>>(password, salt, iterations.get(), &mut salted);
+        pbkdf2::<Hmac<Sha256>>(password, salt, iterations.get(), &mut salted)
+            .map_err(|e| 
+                scram_error_map!(ScramErrorCode::ExternalError, ScramServerError::OtherError,
+                    "pbkdf2 Hmac::<Sha1> err, {}", e)
+            )?;
 
         return Ok(salted);
     }
@@ -244,9 +255,14 @@ impl ScramHashing for ScramSha512
     #[cfg(feature = "use_default")]
     fn derive(password: &[u8], salt: &[u8], iterations: NonZeroU32) -> ScramResult<Vec<u8>> 
     {
-
+        use crate::ScramServerError;
+        
         let mut salted = vec![0; Sha512::output_size()]; //64
-        pbkdf2::<Hmac<Sha512>>(password, salt, iterations.get(), &mut salted);
+        pbkdf2::<Hmac<Sha512>>(password, salt, iterations.get(), &mut salted)
+            .map_err(|e| 
+                scram_error_map!(ScramErrorCode::ExternalError, ScramServerError::OtherError,
+                    "pbkdf2 Hmac::<Sha1> err, {}", e)
+            )?;
 
         return Ok(salted);
     }

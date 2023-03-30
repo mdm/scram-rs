@@ -12,6 +12,9 @@ use std::num::NonZeroU32;
 use std::str;
 use std::marker::PhantomData;
 
+use base64::Engine;
+use base64::engine::general_purpose;
+
 use crate::scram_cbh::AsyncScramCbHelper;
 use crate::{ScramResultServer, scram_ierror, ScramServerError, scram_ierror_map};
 
@@ -154,7 +157,7 @@ impl<'ss, S: ScramHashing, A: AsyncScramAuthServer<S>, B: AsyncScramCbHelper + S
     where T: AsRef<[u8]>
     {
         let decoded = 
-            match base64::decode(input)
+            match general_purpose::STANDARD.decode(input)
                 .map_err(|e| 
                     scram_error_map!(ScramErrorCode::MalformedScramMsg, ScramServerError::InvalidEncoding,
                         "base64 decoding of client response failed with error, '{}'", e)
@@ -324,7 +327,7 @@ impl<'ss, S: ScramHashing, A: AsyncScramAuthServer<S>, B: AsyncScramCbHelper + S
 
                 // verify proof
                 let recv_decoded_proof = 
-                    base64::decode(proof)
+                    general_purpose::STANDARD.decode(proof)
                         .map_err(|e| 
                             scram_error_map!(
                                 ScramErrorCode::MalformedScramMsg, 
@@ -340,7 +343,7 @@ impl<'ss, S: ScramHashing, A: AsyncScramAuthServer<S>, B: AsyncScramCbHelper + S
                         self.username.as_ref().map_or("-missing-", |v| v.as_str()));
                 }
 
-                let output = ["v=", &base64::encode(&server_signature)].concat();
+                let output = ["v=", &general_purpose::STANDARD.encode(&server_signature)].concat();
 
                 // update states
                 self.state = ScramState::Completed;
@@ -480,7 +483,7 @@ impl<'sc, S: ScramHashing, A: AsyncScramAuthClient, B: AsyncScramCbHelper> Async
     fn parse_response_base64<T: AsRef<[u8]>>(&mut self, input: T) -> ScramResult<ScramResultClient>
     {
         let decoded = 
-            base64::decode(input)
+            general_purpose::STANDARD.decode(input)
                 .map_err(|e| 
                     scram_ierror_map!(
                         ScramErrorCode::MalformedScramMsg, 
@@ -541,7 +544,7 @@ impl<'sc, S: ScramHashing, A: AsyncScramAuthClient, B: AsyncScramCbHelper> Async
 
                 //todo channel bind things SASL 
                 let cb_data = 
-                    base64::encode(
+                    general_purpose::STANDARD.encode(
                         [
                             self.chanbind.convert2header().as_bytes(), 
                             self.chanbind.async_get_cb_data_raw(self.chanbind_helper).await?.as_slice(),
@@ -562,7 +565,8 @@ impl<'sc, S: ScramHashing, A: AsyncScramAuthClient, B: AsyncScramCbHelper> Async
                 let keys = self.auth.get_scram_keys().await;
 
                 let salted_password = 
-                    S::derive(self.auth.get_password().await.as_bytes(), &salt, NonZeroU32::new(itrcnt).unwrap())?;
+                    S::derive(self.auth.get_password().await.as_bytes(), &salt, 
+                        NonZeroU32::new(itrcnt).unwrap())?;
 
                 let client_key = S::hmac(keys.get_clinet_key(), &salted_password)?;
                 let server_key = S::hmac(keys.get_server_key(), &salted_password)?;
@@ -577,7 +581,9 @@ impl<'sc, S: ScramHashing, A: AsyncScramAuthClient, B: AsyncScramCbHelper> Async
                     [
                         &client_final_message_bare,
                         ",p=",
-                        &base64::encode(ScramDataParser::xor_arrays(&client_key, &client_signature)?)
+                        &general_purpose::STANDARD.encode(
+                                ScramDataParser::xor_arrays(&client_key, &client_signature)?
+                        )
                     ].concat();
                 
 
@@ -638,7 +644,7 @@ fn scram_sha256_server()
                 Ok(
                     ScramPassword::found_secret_password(
                         ScramSha256::derive(password.as_bytes(), &salt, iterations).unwrap(),
-                        base64::encode(salt), 
+                        general_purpose::STANDARD.encode(salt), 
                         iterations,
                         None
                     )
@@ -681,7 +687,7 @@ fn scram_sha256_server()
     let _username = "user";
     let _password = "pencil";
     let client_nonce = "rOprNGfwEbeRWgbNEkqO";
-    let _client_nonce_dec = base64::decode(client_nonce).unwrap();
+    let _client_nonce_dec = general_purpose::STANDARD.decode(client_nonce).unwrap();
     let client_init = "n,,n=user,r=rOprNGfwEbeRWgbNEkqO";
     let server_init = "r=rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0,s=W22ZaJ0SNY7soEsUEjb6gQ==,i=4096";
     let server_nonce = "%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0";
@@ -793,7 +799,7 @@ fn scram_sha256_works()
     let username = "user";
     let password = "pencil";
     let client_nonce = "rOprNGfwEbeRWgbNEkqO";
-    let client_nonce_dec = base64::decode(client_nonce).unwrap();
+    let client_nonce_dec = general_purpose::STANDARD.decode(client_nonce).unwrap();
     let client_init = "n,,n=user,r=rOprNGfwEbeRWgbNEkqO";
     let server_init = "r=rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0,s=W22ZaJ0SNY7soEsUEjb6gQ==,i=4096";
     let _server_nonce = "%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0";

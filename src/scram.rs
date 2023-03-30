@@ -11,6 +11,9 @@
 
 use std::mem;
 
+use base64::Engine;
+use base64::engine::general_purpose;
+
 use crate::{scram_ierror, ScramRuntimeError};
 
 use super::scram_error::{ScramResult, ScramErrorCode};
@@ -80,9 +83,12 @@ impl ScramResultServer
     {
         match *self
         {
-            Self::Data(ref raw_data) =>  base64::encode(raw_data),
-            Self::Error(ref err) => base64::encode(err.serv_err_value()),
-            Self::Final(ref raw_data) => base64::encode(raw_data),
+            Self::Data(ref raw_data) =>  
+                general_purpose::STANDARD.encode(raw_data),
+            Self::Error(ref err) => 
+                general_purpose::STANDARD.encode(err.serv_err_value()),
+            Self::Final(ref raw_data) => 
+                general_purpose::STANDARD.encode(raw_data),
         }
     }
 
@@ -189,7 +195,7 @@ impl ScramResultClient
         match self
         {
             ScramResultClient::Output(output) => 
-                return Ok(base64::encode(output)),
+                return Ok(general_purpose::STANDARD.encode(output)),
             ScramResultClient::Completed => 
                 scram_ierror!(ScramErrorCode::AuthSeqCompleted, "completed, nothing to extract"),
         }
@@ -244,7 +250,7 @@ impl<'sn> ScramNonce<'sn>
             ScramNonce::None => 
             {
                 return Ok(
-                    base64::encode(
+                    general_purpose::STANDARD.encode(
                         ScramCommon::sc_random(ScramCommon::SCRAM_RAW_NONCE_LEN)?
                     )
                 );
@@ -260,7 +266,7 @@ impl<'sn> ScramNonce<'sn>
                     );
                 }
 
-                return Ok(base64::encode(p));
+                return Ok(general_purpose::STANDARD.encode(p));
             },
             ScramNonce::Base64(b) => 
             {

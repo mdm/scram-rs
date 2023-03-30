@@ -10,6 +10,9 @@
 
 use std::fmt;
 
+use base64::Engine;
+use base64::engine::general_purpose;
+
 use crate::scram_cbh::{ScramCbHelper, AsyncScramCbHelper};
 use crate::{ScramServerError};
 
@@ -251,7 +254,7 @@ impl ChannelBindType
                             //cbind_data
                         ].concat();
                     
-                    let bheader = base64::encode(header);
+                    let bheader = general_purpose::STANDARD.encode(header);
                     
                     bheader
                 },
@@ -290,7 +293,7 @@ impl ChannelBindType
                             //cbind_data
                         ].concat();
                     
-                    let bheader = base64::encode(header);
+                    let bheader = general_purpose::STANDARD.encode(header);
                     
                     bheader
                 },
@@ -331,7 +334,7 @@ impl ChannelBindType
                             //cbind_data
                         ].concat();
                     
-                    let bheader = base64::encode(header);
+                    let bheader = general_purpose::STANDARD.encode(header);
 
 
                     bheader
@@ -427,7 +430,7 @@ impl ChannelBindType
                             //cbind_data
                         ].concat();
                     
-                    let bheader = base64::encode(header);
+                    let bheader = general_purpose::STANDARD.encode(header);
                     
                     bheader
                 },
@@ -466,7 +469,7 @@ impl ChannelBindType
                             //cbind_data
                         ].concat();
                     
-                    let bheader = base64::encode(header);
+                    let bheader = general_purpose::STANDARD.encode(header);
                     
                     bheader
                 },
@@ -507,7 +510,7 @@ impl ChannelBindType
                             //cbind_data
                         ].concat();
                     
-                    let bheader = base64::encode(header);
+                    let bheader = general_purpose::STANDARD.encode(header);
 
 
                     bheader

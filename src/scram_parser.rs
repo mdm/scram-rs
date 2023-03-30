@@ -13,6 +13,9 @@ use std::str;
 use std::str::Chars;
 use std::iter::Peekable;
 
+use base64::Engine;
+use base64::engine::general_purpose;
+
 use crate::ScramCommon;
 use crate::ScramServerError;
 
@@ -325,14 +328,14 @@ impl<'par> ScramDataParser<'par>
         ScramDataParser::q_scram_printable(&nonce)?;
 
         let salt = 
-            base64::decode(self.read_parameter('s')?)
-            .map_err(|e| 
-                scram_error_map!(
-                    ScramErrorCode::MalformedScramMsg, 
-                    ScramServerError::InvalidEncoding,
-                    "parameter s= conversion err, {}", e
-                )
-            )?;
+            general_purpose::STANDARD.decode(self.read_parameter('s')?)
+                .map_err(|e| 
+                    scram_error_map!(
+                        ScramErrorCode::MalformedScramMsg, 
+                        ScramServerError::InvalidEncoding,
+                        "parameter s= conversion err, {}", e
+                    )
+                )?;
 
         let itrcnt = 
             i32::from_str_radix(self.read_parameter('i')?, 10)
@@ -373,7 +376,7 @@ impl<'par> ScramDataParser<'par>
                     ScramData::SmsgFinalMessage
                     {
                         verifier: 
-                            base64::decode(self.read_parameter('v')?)
+                            general_purpose::STANDARD.decode(self.read_parameter('v')?)
                                 .map_err(|e| 
                                     scram_error_map!(ScramErrorCode::MalformedScramMsg, ScramServerError::InvalidEncoding,
                                         "parameter v= conversion err, {}", e)

@@ -11,6 +11,8 @@
 use std::num::NonZeroU32;
 
 use async_trait::async_trait;
+use base64::Engine;
+use base64::engine::general_purpose;
 
 use crate::{scram_error_map, ScramErrorCode, ScramServerError};
 
@@ -161,7 +163,7 @@ impl ScramPassword
             Self::UserNotFound
             {
                 salted_hashed_password: salted_password,
-                salt_b64: base64::encode(salt),
+                salt_b64: general_purpose::STANDARD.encode(salt),
                 iterations: ScramCommon::SCRAM_DEFAULT_SALT_ITER,
                 scram_keys: ScramKey::new(),
             };
@@ -194,7 +196,7 @@ impl ScramPassword
             Self::UserPasswordData
             {
                 salted_hashed_password: salted_password,
-                salt_b64: base64::encode(salt),
+                salt_b64: general_purpose::STANDARD.encode(salt),
                 iterations: ScramCommon::SCRAM_DEFAULT_SALT_ITER,
                 scram_keys: scram_keys_opt.unwrap_or(ScramKey::new()),
             };
@@ -231,7 +233,7 @@ impl ScramPassword
             Self::UserPasswordData
             {
                 salted_hashed_password: salted_password,
-                salt_b64: base64::encode(salt),
+                salt_b64: general_purpose::STANDARD.encode(salt),
                 iterations: iterations,
                 scram_keys: scram_keys_opt.unwrap_or(ScramKey::new()),
             };
@@ -294,7 +296,7 @@ impl ScramPassword
     ) -> ScramResult<Self>
     {
         let shp = 
-            base64::decode(salted_hashed_password)
+            general_purpose::STANDARD.decode(salted_hashed_password)
                 .map_err(|e| 
                     scram_error_map!(ScramErrorCode::ExternalError, ScramServerError::OtherError,
                         "can not decode salted and hashed password in [found_secret_base64_password], {}", e)
@@ -359,7 +361,7 @@ impl ScramPassword
             Self::UserPasswordData
             {
                 salted_hashed_password: salted_password,
-                salt_b64: base64::encode(salt),
+                salt_b64: general_purpose::STANDARD.encode(salt),
                 iterations: iterations,
                 scram_keys: scram_keys_opt.unwrap_or(ScramKey::new()),
             };
@@ -612,7 +614,8 @@ fn test_password_gen()
 
     assert_eq!(res.get_iterations().get(), 4096);
     assert_eq!(res.get_salt_base64().as_str(), "dGVzdA==");
-    assert_eq!(res.get_salted_hashed_password(), base64::decode("afBEmfdaTuiwYy1yoCIQ8XJJ1Awzo3Ha5Mf2aLTRHhs=").unwrap());
+    assert_eq!(res.get_salted_hashed_password(), 
+        general_purpose::STANDARD.decode("afBEmfdaTuiwYy1yoCIQ8XJJ1Awzo3Ha5Mf2aLTRHhs=").unwrap());
 
     return;
 }
