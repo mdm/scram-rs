@@ -363,8 +363,9 @@ impl<'ss, S: ScramHashing, A: ScramAuthServer<S>, B: ScramCbHelper> SyncScramSer
 ///     his implementation where the username and password are stored or
 ///     implement one.  
 /// 
-/// If a developer which to use a channel bind then developer should find
-///     out how to extract endpoint certificate from his TLS connection.
+/// If code which uses this crate supports channel binding then the code uses
+///     this crate should find out how to extract endpoint certificate from 
+///     TLS connection.
 ///     i.e native_tls::TlsStream::tls_server_end_point()  
 pub struct SyncScramClient<'sc, S: ScramHashing, A: ScramAuthClient, B: ScramCbHelper>
 {
