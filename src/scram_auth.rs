@@ -569,11 +569,11 @@ pub trait AsyncScramAuthClient
 fn test_exec_time()
 {
     use std::time::Instant;
-    use super::scram_hashing::ScramSha256;
+    use super::scram_hashing::ScramSha256RustNative;
 
     let start = Instant::now();
 
-    let res = ScramPassword::not_found::<ScramSha256>();
+    let res = ScramPassword::not_found::<ScramSha256RustNative>();
     assert_eq!(res.is_ok(), true);
 
     let el = start.elapsed();
@@ -581,7 +581,7 @@ fn test_exec_time()
 
     let start = Instant::now();
 
-    let res = ScramPassword::found_plaintext_password::<ScramSha256>(b"123", None);
+    let res = ScramPassword::found_plaintext_password::<ScramSha256RustNative>(b"123", None);
     assert_eq!(res.is_ok(), true);
     
     let el = start.elapsed();
@@ -593,12 +593,12 @@ fn test_exec_time()
 fn test_password_gen()
 {
     use std::time::Instant;
-    use super::scram_hashing::ScramSha256;
+    use super::scram_hashing::ScramSha256RustNative;
 
     let start = Instant::now();
 
     let res = 
-        ScramPassword::salt_password_with_params::<_, ScramSha256>(
+        ScramPassword::salt_password_with_params::<_, ScramSha256RustNative>(
             "pencil".to_string().into_bytes(), 
             Some("test".to_string().into_bytes()), 
             Some(NonZeroU32::new(4096).unwrap()),

@@ -65,22 +65,15 @@
 extern crate async_trait;
 extern crate getrandom;
 extern crate base64;
-#[cfg(feature = "use_default")]
 extern crate pbkdf2;
-#[cfg(feature = "use_default")]
 extern crate hmac;
-#[cfg(feature = "use_default")]
 extern crate sha2;
-#[cfg(feature = "use_default")]
 extern crate sha1;
 
 extern crate md5;
 
 #[cfg(feature = "use_ring")]
 extern crate ring;
-
-#[cfg(all(feature = "use_default", feature = "use_ring"))]
-compile_error!("both features: use_default and use_ring can not be used simultaniosly!");
 
 pub mod scram;
 pub mod scram_cb;
@@ -94,6 +87,9 @@ pub mod scram_state;
 pub mod scram_sync;
 #[macro_use]
 pub mod scram_cbh;
+mod scram_hashing_sha1;
+mod scram_hashing_sha2;
+mod scram_hashing_sha5;
 
 pub use scram::*;
 pub use scram_auth::*;

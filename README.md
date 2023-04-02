@@ -1,6 +1,6 @@
 # Scram-rs
 
-v 0.7
+v 0.8
 
 A SCRAM-SHA1, SCRAM-SHA256, SCRAM-SHA512, SCRAM-SHA512-PLUS, SCRAM-SHA256-PLUS client and server.  
 
@@ -18,6 +18,9 @@ A SCRAM-SHA1, SCRAM-SHA256, SCRAM-SHA512, SCRAM-SHA512-PLUS, SCRAM-SHA256-PLUS c
 
 ## Does not support:
 - authzid (a=)
+
+## What is not implemented by design
+This crate does not handle a connection to a remote host for you. This is only a logic. Your program manages the connection, reception of the data and transmitting it back to client/server. This crated performs only logical operaions in received data and retrns the result.
 
 ## Based on:  
 - pbkdf2
@@ -57,4 +60,5 @@ see ./examples/
 | 1         | 97.66ms     | 16.15ms  |
 | 2         | 100.65ms    | 15.98ms  |
 | 3         | 100.05ms    | 17.12ms  |
+
 

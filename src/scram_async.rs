@@ -623,7 +623,7 @@ fn scram_sha256_server()
 {     
     use async_trait::async_trait; 
 
-    use super::scram_hashing::{ScramSha256};
+    use super::scram_hashing::ScramSha256RustNative;
     use super::scram_auth::AsyncScramAuthServer;
 
     struct AuthServer
@@ -632,7 +632,7 @@ fn scram_sha256_server()
     }
 
     #[async_trait]
-    impl AsyncScramAuthServer<ScramSha256> for AuthServer
+    impl AsyncScramAuthServer<ScramSha256RustNative> for AuthServer
     {
         async fn get_password_for_user(&self, _username: &str) -> ScramResult<ScramPassword>
         {
@@ -643,7 +643,7 @@ fn scram_sha256_server()
             return 
                 Ok(
                     ScramPassword::found_secret_password(
-                        ScramSha256::derive(password.as_bytes(), &salt, iterations).unwrap(),
+                        ScramSha256RustNative::derive(password.as_bytes(), &salt, iterations).unwrap(),
                         general_purpose::STANDARD.encode(salt), 
                         iterations,
                         None
@@ -701,7 +701,7 @@ fn scram_sha256_server()
 
     let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
     let scram_res = 
-        AsyncScramServer::<ScramSha256, AuthServer, AuthServer>::new(&serv, &serv, nonce, scramtype);
+        AsyncScramServer::<ScramSha256RustNative, AuthServer, AuthServer>::new(&serv, &serv, nonce, scramtype);
     assert_eq!(scram_res.is_ok(), true);
 
     let mut scram = scram_res.unwrap();
@@ -734,7 +734,7 @@ fn scram_sha256_works()
 { 
     use async_trait::async_trait; 
 
-    use super::scram_hashing::ScramSha256;
+    use super::scram_hashing::ScramSha256RustNative;
     use super::scram_auth::AsyncScramAuthClient;
     use super::scram_auth::ScramKey;
 
@@ -814,7 +814,7 @@ fn scram_sha256_works()
     let nonce = ScramNonce::Plain(&client_nonce_dec);
 
     let scram_res = 
-        AsyncScramClient::<ScramSha256, AuthClient, AuthClient>::new(&ac, nonce, cbt, &ac);
+        AsyncScramClient::<ScramSha256RustNative, AuthClient, AuthClient>::new(&ac, nonce, cbt, &ac);
     assert_eq!(scram_res.is_ok(), true);
 
     let mut scram = scram_res.unwrap();

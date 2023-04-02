@@ -6,7 +6,7 @@ use scram_rs::AsyncScramAuthServer;
 use scram_rs::AsyncScramCbHelper;
 use scram_rs::ScramResult;
 use scram_rs::ScramResultClient;
-use scram_rs::ScramSha256;
+use scram_rs::ScramSha256RustNative;
 use scram_rs::ScramNonce;
 use scram_rs::ScramPassword;
 use scram_rs::async_trait;
@@ -50,7 +50,7 @@ impl AsyncScramCbHelper for AuthDB
 
 
 #[async_trait]
-impl AsyncScramAuthServer<ScramSha256> for AuthDB
+impl AsyncScramAuthServer<ScramSha256RustNative> for AuthDB
 {
     async 
     fn get_password_for_user(&self, username: &str) -> ScramResult<ScramPassword>
@@ -67,7 +67,7 @@ impl AsyncScramAuthServer<ScramSha256> for AuthDB
             }
             else 
             {
-                ScramPassword::not_found::<ScramSha256>()
+                ScramPassword::not_found::<ScramSha256RustNative>()
             };       
     }
 }
@@ -152,7 +152,7 @@ pub fn main()
                         let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
                     
                         let mut server = 
-                            AsyncScramServer::<ScramSha256, AuthDB, AuthDB>::new(&authdb, &authdb, ScramNonce::none(), scramtype).unwrap();
+                            AsyncScramServer::<ScramSha256RustNative, AuthDB, AuthDB>::new(&authdb, &authdb, ScramNonce::none(), scramtype).unwrap();
                     
                         loop
                         {
@@ -180,7 +180,7 @@ pub fn main()
                 );
 
             let mut client =
-                AsyncScramClient::<ScramSha256, AuthClient, AuthClient>::new(&client, ScramNonce::None, scram_rs::ChannelBindType::None, &client).unwrap();
+                AsyncScramClient::<ScramSha256RustNative, AuthClient, AuthClient>::new(&client, ScramNonce::None, scram_rs::ChannelBindType::None, &client).unwrap();
 
             // client sends initial message: cli -> serv
             let ci = client.init_client().await.encode_output_base64().unwrap();
