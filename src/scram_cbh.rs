@@ -18,7 +18,7 @@ pub trait ScramCbHelper
 {
     /// This function returns (on success) a TLS endpoint cert data.
     /// For example from function: native_tls::TlsStream::tls_server_end_point()
-    /// To indicate error, use macros: [HELPER_ERROR_CLIENT] or [HELPER_ERROR_SERVER]
+    /// To indicate error, use macros: HELPER_ERROR_CLIENT or HELPER_ERROR_SERVER
     fn get_tls_server_endpoint(&self) -> ScramResult<Vec<u8>>
     {
         scram_ierror!(
@@ -28,7 +28,7 @@ pub trait ScramCbHelper
     }
 
     /// This function returns (on success) a TLS unique data.
-    /// To indicate error, use macros: [HELPER_ERROR_CLIENT] or [HELPER_ERROR_SERVER]
+    /// To indicate error, use macros: HELPER_ERROR_CLIENT or HELPER_ERROR_SERVER
     fn get_tls_unique(&self) -> ScramResult<Vec<u8>>
     {
         scram_ierror!(
@@ -38,7 +38,7 @@ pub trait ScramCbHelper
     }
 
     /// This function returns (on success) a TLS exporter (TLS 1.3) data.
-    /// To indicate error, use macros: [HELPER_ERROR_CLIENT] or [HELPER_ERROR_SERVER]
+    /// To indicate error, use macros: HELPER_ERROR_CLIENT or HELPER_ERROR_SERVER
     fn get_tls_exporter(&self) -> ScramResult<Vec<u8>>
     {
         scram_ierror!(
@@ -55,22 +55,42 @@ pub trait ScramCbHelper
 /// * TLS unique
 /// * TLS exporter data
 /// 
-/// By defualt each function returns error: [ScramErrorCode::ChanBindNotImplemented]
+/// By defualt each function returns error: ScramErrorCode::ChanBindNotImplemented
 #[async_trait]
 pub trait AsyncScramCbHelper: Sync
 {
     /// This function returns (on success) a TLS endpoint cert data.
     /// For example from function: native_tls::TlsStream::tls_server_end_point()
-    /// To indicate error, use macros: [HELPER_ERROR_CLIENT] or [HELPER_ERROR_SERVER]
-    async fn get_tls_server_endpoint(&self) -> ScramResult<Vec<u8>>;
+    /// To indicate error, use macros: HELPER_ERROR_CLIENT or HELPER_ERROR_SERVER
+    async fn get_tls_server_endpoint(&self) -> ScramResult<Vec<u8>>
+    {
+        {
+            scram_ierror!(
+                ScramErrorCode::ChanBindNotImplemented, 
+                "`tls_server_endpoint` not implemented!"
+            );
+        }
+    }
 
     /// This function returns (on success) a TLS unique data.
-    /// To indicate error, use macros: [HELPER_ERROR_CLIENT] or [HELPER_ERROR_SERVER]
-    async fn get_tls_unique(&self) -> ScramResult<Vec<u8>>;
+    /// To indicate error, use macros: HELPER_ERROR_CLIENT or HELPER_ERROR_SERVER
+    async fn get_tls_unique(&self) -> ScramResult<Vec<u8>>
+    {
+        scram_ierror!(
+            ScramErrorCode::ChanBindNotImplemented, 
+            "`tls_unique` not implemented!"
+        );
+    }
 
     /// This function returns (on success) a TLS exporter (TLS 1.3) data.
-    /// To indicate error, use macros: [HELPER_ERROR_CLIENT] or [HELPER_ERROR_SERVER]
-    async fn get_tls_exporter(&self) -> ScramResult<Vec<u8>>;
+    /// To indicate error, use macros: HELPER_ERROR_CLIENT or HELPER_ERROR_SERVER
+    async fn get_tls_exporter(&self) -> ScramResult<Vec<u8>>
+    {
+        scram_ierror!(
+            ScramErrorCode::ChanBindNotImplemented, 
+            "`tls_exporter` not implemented!"
+        );
+    }
 }
 
 /// Use this macro in functions of trais [ScramCbHelper], [AsyncScramCbHelper]

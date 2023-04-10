@@ -38,7 +38,7 @@ use super::scram::{ScramNonce, ScramResultClient};
 /// A: ScramAuthServer is a callback trait for authentification. Developer
 ///     must attach the ScramAuthServer trait to his authentification
 ///     implementation.  
-/// If client picks SCRAM-SHA-<any>-PLUS then the developer should 
+/// If client picks SCRAM-SHA-\<any\>-PLUS then the developer should 
 ///     also provide the data_chanbind argument with the server
 ///     certificate endpoint i.e native_tls::TlsStream::tls_server_end_point()  
 pub struct SyncScramServer<'ss, S: ScramHashing, A: ScramAuthServer<S>, B: ScramCbHelper>
@@ -145,7 +145,7 @@ impl<'ss, S: ScramHashing, A: ScramAuthServer<S>, B: ScramCbHelper> SyncScramSer
     /// 
     /// # Returns
     /// 
-    /// * ScramResult<[ScramParse]> the response will be encoded to UTF-8
+    /// * The [ScramResultServer] is returned with the result.
     pub 
     fn parse_response_base64<T>(&mut self, input: T) -> ScramResultServer
     where T: AsRef<[u8]>
@@ -190,8 +190,7 @@ impl<'ss, S: ScramHashing, A: ScramAuthServer<S>, B: ScramCbHelper> SyncScramSer
     /// 
     /// # Returns
     /// 
-    /// * ScramResult<[ScramParse]> the response will be encoded to UTF-8 depending on
-    /// argument `to_base` 
+    /// * The [ScramResultServer] is returned with the result.
     #[inline]
     pub 
     fn parse_response(&mut self, resp: &str) -> ScramResultServer
@@ -480,7 +479,12 @@ impl<'sc, S: ScramHashing, A: ScramAuthClient, B: ScramCbHelper> SyncScramClient
     /// 
     /// # Returns
     /// 
-    /// * ScramResult<[ScramParse]> the response will be encoded to UTF-8 
+    /// * The [Result] is returned as alias [ScramResult].
+    /// 
+    /// - [Result::Ok] is returned with [ScramResultClient] which contains a hint how to
+    ///     act on the next step.
+    /// 
+    /// - [Result::Err] is returned in case of error.
     pub 
     fn parse_response_base64<T: AsRef<[u8]>>(&mut self, input: T) -> ScramResult<ScramResultClient>
     {
@@ -516,8 +520,12 @@ impl<'sc, S: ScramHashing, A: ScramAuthClient, B: ScramCbHelper> SyncScramClient
     /// 
     /// # Returns
     /// 
-    /// * ScramResult<[ScramParse]> the response will be encoded to UTF-8 depending on
-    /// argument `to_base64`
+    /// * The [Result] is returned as alias [ScramResult].
+    /// 
+    /// - [Result::Ok] is returned with [ScramResultClient] which contains a hint how to
+    ///     act on the next step.
+    /// 
+    /// - [Result::Err] is returned in case of error.
     pub 
     fn parse_response(&mut self, resp: &str) -> ScramResult<ScramResultClient>
     {

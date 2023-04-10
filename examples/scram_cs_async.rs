@@ -39,12 +39,13 @@ impl AsyncScramCbHelper for AuthDB
     fn get_tls_unique(&self) -> ScramResult<Vec<u8>> {
         scram_rs::HELPER_UNSUP_SERVER!("unique");
     }
-
+/*
     async 
     fn get_tls_exporter(&self) -> ScramResult<Vec<u8>> 
     {
         scram_rs::HELPER_UNSUP_SERVER!("exporter");
     }
+    */
 }
 
 

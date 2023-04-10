@@ -37,7 +37,7 @@ use super::scram::{ScramNonce, ScramResultClient};
 /// A: [AsyncScramAuthServer] is a callback trait for authentification. Developer
 ///     must attach the ScramAuthServer trait to his authentification
 ///     implementation.  
-/// If client picks SCRAM-SHA-<any>-PLUS then the developer should 
+/// If client picks SCRAM-SHA-\<any\>-PLUS then the developer should 
 ///     also provide the data_chanbind argument with the server
 ///     certificate endpoint i.e native_tls::TlsStream::tls_server_end_point()
 pub struct AsyncScramServer<'ss, S: ScramHashing, A: AsyncScramAuthServer<S>, B: AsyncScramCbHelper + Sync>
@@ -147,11 +147,11 @@ impl<'ss, S: ScramHashing, A: AsyncScramAuthServer<S>, B: AsyncScramCbHelper + S
     /// 
     /// # Arguments
     /// 
-    /// * `input` - A response from client.
+    /// * `input` - A response received from client.
     /// 
     /// # Returns
     /// 
-    /// * ScramResult<[ScramParse]> the response will be encoded to UTF-8
+    /// * A [ScramResultServer] is returned.
     pub async 
     fn parse_response_base64<T>(&mut self, input: T) -> ScramResultServer
     where T: AsRef<[u8]>
@@ -195,8 +195,7 @@ impl<'ss, S: ScramHashing, A: AsyncScramAuthServer<S>, B: AsyncScramCbHelper + S
     /// 
     /// # Returns
     /// 
-    /// * ScramResult<[ScramParse]> the response will be encoded to UTF-8 depending on
-    /// argument `to_base`
+    /// * The [ScramResultServer] is returned.
     #[inline]
     pub async
     fn parse_response(&mut self, resp: &str) -> ScramResultServer
@@ -394,11 +393,11 @@ impl<'sc, S: ScramHashing, A: AsyncScramAuthClient, B: AsyncScramCbHelper> Async
     /// 
     /// * `scram_nonce` - a client scram nonce [ScramNonce]
     /// 
-    /// * `chan_bind_type` - picks the channel bound [ClientChannelBindingType]. It is
+    /// * `chan_bind_type` - picks the channel bound [ChannelBindType]. It is
     ///                     responsibility of the developer to correctly set the chan binding
     ///                     type.
     /// 
-    /// * `chan_bind_helper` - a data type which implements a traint [AsyncScramCbHelperClient] which
+    /// * `chan_bind_helper` - a data type which implements a traint [AsyncScramCbHelper] which
     ///                 contains the function for realization which are designed to provide the
     ///                 channel bind data to the `SCRAM` crate.
     /// 
@@ -478,7 +477,12 @@ impl<'sc, S: ScramHashing, A: AsyncScramAuthClient, B: AsyncScramCbHelper> Async
     /// 
     /// # Returns
     /// 
-    /// * ScramResult<[ScramParse]> the response will be encoded to UTF-8 
+    /// * The [Result] is returned as alias [ScramResult].
+    /// 
+    /// - [Result::Ok] is returned with [ScramResultClient] which contains a hint how to
+    ///     act on the next step.
+    /// 
+    /// - [Result::Err] is returned in case of error.
     pub async 
     fn parse_response_base64<T: AsRef<[u8]>>(&mut self, input: T) -> ScramResult<ScramResultClient>
     {
@@ -516,8 +520,12 @@ impl<'sc, S: ScramHashing, A: AsyncScramAuthClient, B: AsyncScramCbHelper> Async
     /// 
     /// # Returns
     /// 
-    /// * ScramResult<[ScramParse]> the response will be encoded to UTF-8 depending on
-    /// argument `to_base64`
+    /// * The [Result] is returned as alias [ScramResult].
+    /// 
+    /// - [Result::Ok] is returned with [ScramResultClient] which contains a hint how to
+    ///     act on the next step.
+    /// 
+    /// - [Result::Err] is returned in case of error.
     pub async 
     fn parse_response(&mut self, resp: &str) -> ScramResult<ScramResultClient>
     {

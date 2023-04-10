@@ -22,8 +22,7 @@
 //! - -PLUS
 //!
 //! Features:
-//! - `use_default` - uses crates: [pbkdf2], [hmac], [sha2], [sha1] as a common hasing libs
-//! - `use_ring` - uses crates: [ring] as a common hashing lib
+//! - `use_ring` - addes crate: [ring] as an alternative hashing and other crypto functions.
 //!
 //! For default crypto crates:
 //! scram-rs = { version = "0.4", default-features = true}
@@ -33,7 +32,7 @@
 //! 
 //! ### scram_sha256_server() sync/async tests (DEBUG)
 //! 
-//! | iteration | use_default | use_ring |
+//! | iteration | rust-native | use_ring |
 //! |-----------|-------------|----------|
 //! | 1         | 152.30ms    | 16.96ms  |
 //! | 2         | 143.78ms    | 16.52ms  |
@@ -42,7 +41,7 @@
 //! 
 //! ### scram_sha256_works() async tests (DEBUG)
 //! 
-//! | iteration | use_default | use_ring |
+//! | iteration | rust-native | use_ring |
 //! |-----------|-------------|----------|
 //! | 1         | 143.68ms    | 16.15ms  |
 //! | 2         | 143.66ms    | 15.98ms  |
