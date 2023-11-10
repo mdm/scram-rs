@@ -1,7 +1,6 @@
 /*-
  * Scram-rs - a SCRAM authentification authorization library
- * Copyright (C) 2021  Aleksandr Morozov, RELKOM s.r.o
- * Copyright (C) 2021-2022  Aleksandr Morozov
+ * Copyright (C) 2021  Aleksandr Morozov
  * 
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -10,10 +9,6 @@
 
 //! Scram-RS (Sync and Async)
 //! 
-//! Since v 0.4.2 this project is relicensed with MPLv2.0.
-//! The contributors and authors agreed to change license:
-//! Aleksandr Morozov
-//! RELKOM s.r.o
 //! 
 //! Provides a SASL SCRAM:
 //! - SHA1 
@@ -22,7 +17,7 @@
 //! - -PLUS
 //!
 //! Features:
-//! - `use_ring` - addes crate: [ring] as an alternative hashing and other crypto functions.
+//! - `use_ring` - adds crate: [ring] as an alternative hashing and other crypto functions.
 //!
 //! For default crypto crates:
 //! scram-rs = { version = "0.4", default-features = true}
@@ -84,11 +79,15 @@ pub mod scram_async;
 pub mod scram_parser;
 pub mod scram_state;
 pub mod scram_sync;
+pub mod scram_sync_client;
+pub mod scram_sync_server;
 #[macro_use]
 pub mod scram_cbh;
 mod scram_hashing_sha1;
 mod scram_hashing_sha2;
 mod scram_hashing_sha5;
+
+pub mod scram_dyn;
 
 pub use scram::*;
 pub use scram_auth::*;
@@ -97,6 +96,7 @@ pub use scram_cb::ChannelBindType;
 pub use scram_hashing::*;
 pub use scram_error::*;
 pub use scram_cbh::*;
+pub use scram_dyn::*;
 
 pub use async_trait::async_trait;
 

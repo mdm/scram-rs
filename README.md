@@ -1,8 +1,12 @@
 # Scram-rs
 
-v 0.8
+v 0.9
 
 A SCRAM-SHA1, SCRAM-SHA256, SCRAM-SHA512, SCRAM-SHA512-PLUS, SCRAM-SHA256-PLUS client and server.  
+
+## License:
+
+MPL-2.0
 
 ## Supports:  
 - SHA-1 hasher
@@ -15,14 +19,18 @@ A SCRAM-SHA1, SCRAM-SHA256, SCRAM-SHA512, SCRAM-SHA512-PLUS, SCRAM-SHA256-PLUS c
   or use with async
 - Client/Server key (custom)
 - Error handling `server-error` RFC5802 (`e=server-error-value`)
+- Dynamic instance i.e store the instance as dyn object instead of the generic struct
 
 ## Does not support:
 - authzid (a=)
 
 ## What is not implemented by design
-This crate does not handle a connection to a remote host for you. This is only a logic. Your program manages the connection, reception of the data and transmitting it back to client/server. This crated performs only logical operaions in received data and retrns the result.
+This crate does not open a remote connection to host for you. It does not contain a code to open a connection to any remote target. 
+This crate contains only a SCRAM-SHA logic. Your program manages the connection itself, reception of the data itself and transmitting 
+it back to client/server on its own. This crated performs only logical operaions on received data and retrns the result to your program.
+This appreoach inreases a flexibility. This crate also implements a signalling so there is no need to implement a special error handling.
 
-## Based on:  
+## Based on crates:  
 - pbkdf2
 - sha2 
 - sha-1
@@ -33,14 +41,23 @@ This crate does not handle a connection to a remote host for you. This is only a
 - ring
 
 ## Features:
-- `use_default` - uses crates: [pbkdf2], [hmac], [sha2], [sha1] as a common hasing libs
-- `use_ring` - uses crates: [ring] as a common hashing lib
+
+By default the following crates: [pbkdf2], [hmac], [sha2], [sha1] are included with this crate and a trait objects are availeble.
+- `use_ring` - adds crate: [ring] to the crate and a trait objects becomes available.
 
 Both features can not be used at the same time.
 
+## Warnings:
+
+- This crate does not open network connection to anywhere. And must never!
+- This crate has never been audited, only static tests proofs the correctness of its operation.
+- This crate uses unverified cryptography crates. There is no warranty that the operaion of those crates is correct all the time.
+
+Author of this crate is not responsible for anything which may happen.
+
 ## Usage:  
 
-see ./examples/
+see ./examples/ [there](https://gitlab.com/relkom/scram-rs/-/tree/master/examples)
 
 ## Test based benchmarks:
 

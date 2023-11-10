@@ -1,12 +1,13 @@
 [package]
 name = "scram-rs"
-version = "0.8.1"
+version = "0.10.0"
 authors = ["Aleksandr Morozov <alex@nixd.org>"]
 edition = "2021"
 description="Salted Challenge Response Authentication Mechanism (SCRAM) SASL mechanism, a library which implements SCRAM logic"
 repository = "https://gitlab.com/relkom/scram-rs"
 keywords = ["SCRAM", "SASL"]
 categories = ["authentication", "network-programming"]
+documentation = "https://docs.rs/scram-rs/latest/scram_rs/"
 license="MPL-2.0"
 
 [profile.dev]
@@ -32,7 +33,7 @@ sha2 = "0.10"
 hmac = "0.12"
 pbkdf2 = "0.12"
 
-ring = "0.16"
+ring = "0.17"
 
 async-trait = "0.1"
 

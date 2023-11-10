@@ -10,7 +10,7 @@ use scram_rs::ScramNonce;
 use scram_rs::ScramPassword;
 use scram_rs::ScramAuthServer;
 use scram_rs::scram_sync::SyncScramClient;
-use scram_rs::scram_sync::SyncScramServer;
+use scram_rs::scram_sync::{SyncScramServer, ScramServerDyn};
 use scram_rs::ScramCommon;
 
 struct AuthDB
@@ -111,7 +111,7 @@ pub fn main()
                 {
                     let client_data = serv_recv.recv().unwrap();
 
-                    let serv_data = server.parse_response_base64(client_data);
+                    let serv_data = server.parse_response_base64(client_data.as_bytes());
                     serv_send.send(serv_data.encode_base64()).unwrap();
 
                     match serv_data
