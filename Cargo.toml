@@ -1,10 +1,10 @@
 [package]
 name = "scram-rs"
-version = "0.10.0"
+version = "0.10.1"
 authors = ["Aleksandr Morozov <alex@nixd.org>"]
 edition = "2021"
 description="Salted Challenge Response Authentication Mechanism (SCRAM) SASL mechanism, a library which implements SCRAM logic"
-repository = "https://gitlab.com/relkom/scram-rs"
+repository = "https://repo.4neko.org/4NEKO/scram-rs"
 keywords = ["SCRAM", "SASL"]
 categories = ["authentication", "network-programming"]
 documentation = "https://docs.rs/scram-rs/latest/scram_rs/"
