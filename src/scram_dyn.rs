@@ -7,6 +7,8 @@
  *  file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
+use async_trait::async_trait;
+
 use crate::ScramResultServer;
 
 /// A trait for the Server which can be used to convert the instance 
@@ -17,6 +19,17 @@ pub trait ScramServerDyn
     fn get_auth_username(&self) -> Option<&String>;
     fn parse_response_base64(&mut self, input: &[u8]) -> ScramResultServer;
     fn parse_response(&mut self, resp: &str) -> ScramResultServer;
+}
+
+/// A trait for the Server which can be used to convert the instance 
+/// into the dyn Object in order to store it in the list as a generalized 
+/// instance.
+#[async_trait]
+pub trait AsyncScramServerDyn: Send
+{
+    fn get_auth_username(&self) -> Option<&String>;
+    async fn parse_response_base64(&mut self, input: &[u8]) -> ScramResultServer;
+    async fn parse_response(&mut self, resp: &str) -> ScramResultServer;
 }
 
 pub trait ScramClientDyn

@@ -1,6 +1,6 @@
 [package]
 name = "scram-rs"
-version = "0.10.1"
+version = "0.11.0"
 authors = ["Aleksandr Morozov <alex@nixd.org>"]
 edition = "2021"
 description="Salted Challenge Response Authentication Mechanism (SCRAM) SASL mechanism, a library which implements SCRAM logic"
@@ -9,14 +9,6 @@ keywords = ["SCRAM", "SASL"]
 categories = ["authentication", "network-programming"]
 documentation = "https://docs.rs/scram-rs/latest/scram_rs/"
 license="MPL-2.0"
-
-[profile.dev]
-opt-level = 0
-
-[profile.release]
-opt-level = 3
-overflow-checks = true
-lto = true
 
 [features]
 default = []
@@ -45,6 +37,9 @@ tokio = { version = "1", features = ["full"] }
 name = "scram_cs"
 
 [[example]]
+name = "scram_cs_dyn"
+
+[[example]]
 name = "scram_cs_key"
 
 [[example]]
@@ -52,3 +47,9 @@ name = "scram_cs_err"
 
 [[example]]
 name = "scram_cs_async_err"
+
+[[example]]
+name = "scram_cs_async_dyn"
+
+[[example]]
+name = "scram_cs_variable"

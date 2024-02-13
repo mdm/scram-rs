@@ -1,6 +1,7 @@
 
 use std::num::NonZeroU32;
 
+use scram_rs::BorrowOrConsume;
 use scram_rs::ScramAuthClient;
 use scram_rs::ScramCbHelper;
 use scram_rs::ScramResult;
@@ -10,7 +11,7 @@ use scram_rs::ScramNonce;
 use scram_rs::ScramPassword;
 use scram_rs::ScramAuthServer;
 use scram_rs::scram_sync::SyncScramClient;
-use scram_rs::scram_sync::{SyncScramServer, ScramServerDyn};
+use scram_rs::scram_sync::SyncScramServer;
 use scram_rs::ScramCommon;
 
 #[derive(Debug)]
@@ -26,7 +27,12 @@ impl AuthDB
     }
 }
 
-impl ScramCbHelper for AuthDB
+#[derive(Debug)]
+struct AuthDBCb
+{
+}
+
+impl ScramCbHelper for AuthDBCb
 {
     
 }
@@ -48,7 +54,7 @@ impl ScramAuthServer<ScramSha256RustNative> for AuthDB
             else 
             {
                 ScramPassword::not_found::<ScramSha256RustNative>()
-            };  
+            };      
     }
 }
 
@@ -95,25 +101,32 @@ impl AuthClient
 /// This example will not run, because it requires server, see tests in scram_sync.rs
 pub fn main()
 {
-    let client = AuthClient::new("user0", "password");
+    let client = AuthClient::new("user", "password");
     
     let (clie_send, serv_recv) = std::sync::mpsc::channel::<String>();
     let (serv_send, clie_recv) = std::sync::mpsc::channel::<String>();
 
+    let authdb = AuthDB::new();
+    let authdbcb = AuthDBCb{};
+    let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
+
+    let server = 
+        SyncScramServer
+            ::<ScramSha256RustNative, AuthDB, AuthDBCb>
+            ::new_variable(BorrowOrConsume::from(authdb), BorrowOrConsume::from(authdbcb), ScramNonce::none(), BorrowOrConsume::from(scramtype.clone())).unwrap();
+
     let hndl = 
         std::thread::spawn(move || 
             {
-                let authdb = AuthDB::new();
-                let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
+                
             
-                let mut server = 
-                    SyncScramServer::<ScramSha256RustNative, AuthDB, AuthDB>::new(&authdb, &authdb, ScramNonce::none(), scramtype).unwrap();
-            
+                let mut server_dyn = server.make_dyn();
+
                 loop
                 {
                     let client_data = serv_recv.recv().unwrap();
 
-                    let serv_data = server.parse_response_base64(client_data.as_bytes());
+                    let serv_data = server_dyn.parse_response_base64(client_data.as_bytes());
                     serv_send.send(serv_data.encode_base64()).unwrap();
 
                     match serv_data

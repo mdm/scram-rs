@@ -1,8 +1,8 @@
 # Scram-rs
 
-v 0.9
+v 0.11
 
-A SCRAM-SHA1, SCRAM-SHA256, SCRAM-SHA512, SCRAM-SHA512-PLUS, SCRAM-SHA256-PLUS client and server.  
+A SCRAM-SHA1, SCRAM-SHA256, SCRAM-SHA512, SCRAM-SHA256-PLUS client and server.  
 
 ## License:
 
@@ -13,16 +13,17 @@ MPL-2.0
 - SHA-256 hasher (tested with Postfix Dovecot SASL)
 - SHA-512 hasher
 - Client/Server sync
-- Server Channel Binding 256, 512 untested (user must implement the trait to provide necessary data)
-- Client Channel Binding 256, 512 untested
-- a partial support of async which allows to integrate it in async code
-  or use with async
+- Server Channel Binding 256 untested (user must implement the trait to provide necessary data)
+- Client Channel Binding 256 untested
+- A support of async which allows to integrate it in async code or use with async
 - Client/Server key (custom)
 - Error handling `server-error` RFC5802 (`e=server-error-value`)
-- Dynamic instance i.e store the instance as dyn object instead of the generic struct
+- Dynamic server instance i.e store the instance as dyn object instead of the generic struct
+- Initialize the Scram Client/Server with borrowed or consumed instances.
 
 ## Does not support:
 - authzid (a=)
+- Channel binding SHA-1 which is unsafe.
 
 ## What is not implemented by design
 This crate does not open a remote connection to host for you. It does not contain a code to open a connection to any remote target. 
@@ -79,3 +80,47 @@ see ./examples/ [there](https://gitlab.com/relkom/scram-rs/-/tree/master/example
 | 3         | 100.05ms    | 17.12ms  |
 
 
+## Examples:
+
+### Init:
+
+Generic struct:
+```rust
+  let authdb = AuthDB::new();
+  let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
+
+  let mut server = 
+      SyncScramServer::<ScramSha256RustNative, AuthDB, AuthDB>::new(&authdb, &authdb, ScramNonce::none(), scramtype).unwrap();
+```
+
+Dynamic:
+```rust
+  let authdb = AuthDB::new();
+  let authdbcb = AuthDBCb{};
+  let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
+
+  let server = 
+      SyncScramServer
+          ::<ScramSha256RustNative, AuthDB, AuthDBCb>
+          ::new_variable(BorrowOrConsume::from(authdb), BorrowOrConsume::from(authdbcb), ScramNonce::none(), BorrowOrConsume::from(scramtype.clone())).unwrap();
+
+  let mut server_dyn = server.make_dyn();
+```
+
+Custom:
+```rust
+  let authdb = AuthDB::new();
+  let conninst = ConnectionInst::new();
+  let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
+
+  let mut server = 
+      SyncScramServer
+          ::<ScramSha256RustNative, AuthDB, ConnectionInst>
+          ::new_variable(
+              BorrowOrConsume::from(authdb), 
+              BorrowOrConsume::from(conninst), 
+              ScramNonce::none(), 
+              BorrowOrConsume::from(scramtype)
+          )
+          .unwrap();
+```

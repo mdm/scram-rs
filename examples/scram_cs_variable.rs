@@ -1,6 +1,7 @@
 
 use std::num::NonZeroU32;
 
+use scram_rs::BorrowOrConsume;
 use scram_rs::ScramAuthClient;
 use scram_rs::ScramCbHelper;
 use scram_rs::ScramResult;
@@ -10,7 +11,7 @@ use scram_rs::ScramNonce;
 use scram_rs::ScramPassword;
 use scram_rs::ScramAuthServer;
 use scram_rs::scram_sync::SyncScramClient;
-use scram_rs::scram_sync::{SyncScramServer, ScramServerDyn};
+use scram_rs::scram_sync::{ScramServerDyn, SyncScramServer};
 use scram_rs::ScramCommon;
 
 #[derive(Debug)]
@@ -26,7 +27,18 @@ impl AuthDB
     }
 }
 
-impl ScramCbHelper for AuthDB
+#[derive(Debug)]
+struct ConnectionInst {}
+
+impl ConnectionInst
+{
+    fn new() -> Self
+    {
+        return Self{};
+    }
+}
+
+impl ScramCbHelper for ConnectionInst
 {
     
 }
@@ -48,7 +60,7 @@ impl ScramAuthServer<ScramSha256RustNative> for AuthDB
             else 
             {
                 ScramPassword::not_found::<ScramSha256RustNative>()
-            };  
+            };      
     }
 }
 
@@ -78,9 +90,20 @@ impl ScramAuthClient for AuthClient
     }
 }
 
-impl ScramCbHelper for AuthClient
+#[derive(Debug)]
+struct AuthClientCb {}
+
+impl ScramCbHelper for AuthClientCb
 {
     
+}
+
+impl AuthClientCb
+{
+    fn new() -> Self
+    {
+        return Self{};
+    }
 }
 
 impl AuthClient
@@ -95,7 +118,8 @@ impl AuthClient
 /// This example will not run, because it requires server, see tests in scram_sync.rs
 pub fn main()
 {
-    let client = AuthClient::new("user0", "password");
+    let client = AuthClient::new("user", "password");
+    let clientcb = AuthClientCb::new();
     
     let (clie_send, serv_recv) = std::sync::mpsc::channel::<String>();
     let (serv_send, clie_recv) = std::sync::mpsc::channel::<String>();
@@ -104,10 +128,19 @@ pub fn main()
         std::thread::spawn(move || 
             {
                 let authdb = AuthDB::new();
+                let conninst = ConnectionInst::new();
                 let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
             
                 let mut server = 
-                    SyncScramServer::<ScramSha256RustNative, AuthDB, AuthDB>::new(&authdb, &authdb, ScramNonce::none(), scramtype).unwrap();
+                    SyncScramServer
+                        ::<ScramSha256RustNative, AuthDB, ConnectionInst>
+                        ::new_variable(
+                            BorrowOrConsume::from(authdb), 
+                            BorrowOrConsume::from(conninst), 
+                            ScramNonce::none(), 
+                            BorrowOrConsume::from(scramtype)
+                        )
+                        .unwrap();
             
                 loop
                 {
@@ -135,7 +168,9 @@ pub fn main()
         );
 
     let mut client =
-        SyncScramClient::<ScramSha256RustNative, AuthClient, AuthClient>::new(&client, ScramNonce::None, scram_rs::ChannelBindType::None, &client).unwrap();
+        SyncScramClient
+            ::<ScramSha256RustNative, AuthClient, AuthClientCb>
+            ::new_variable(BorrowOrConsume::from(client), ScramNonce::None, scram_rs::ChannelBindType::None, BorrowOrConsume::from(clientcb)).unwrap();
 
     // client sends initial message: cli -> serv
     let ci = client.init_client().encode_output_base64().unwrap();

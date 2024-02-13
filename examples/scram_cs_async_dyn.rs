@@ -4,6 +4,7 @@ use std::num::NonZeroU32;
 use scram_rs::AsyncScramAuthClient;
 use scram_rs::AsyncScramAuthServer;
 use scram_rs::AsyncScramCbHelper;
+use scram_rs::BorrowOrConsume;
 use scram_rs::ScramResult;
 use scram_rs::ScramResultClient;
 use scram_rs::ScramSha256RustNative;
@@ -27,8 +28,13 @@ impl AuthDB
     }
 }
 
+#[derive(Debug)]
+struct AuthDBCb
+{
+}
+
 #[async_trait]
-impl AsyncScramCbHelper for AuthDB
+impl AsyncScramCbHelper for AuthDBCb
 {
     async 
     fn get_tls_server_endpoint(&self) -> ScramResult<Vec<u8>> 
@@ -40,13 +46,16 @@ impl AsyncScramCbHelper for AuthDB
     fn get_tls_unique(&self) -> ScramResult<Vec<u8>> {
         scram_rs::HELPER_UNSUP_SERVER!("unique");
     }
-
+/*
     async 
     fn get_tls_exporter(&self) -> ScramResult<Vec<u8>> 
     {
         scram_rs::HELPER_UNSUP_SERVER!("exporter");
     }
+    */
 }
+
+
 
 #[async_trait]
 impl AsyncScramAuthServer<ScramSha256RustNative> for AuthDB
@@ -119,6 +128,9 @@ impl AsyncScramAuthClient for AuthClient
     }
 }
 
+
+
+
 impl AuthClient
 {
     pub 
@@ -137,25 +149,32 @@ pub fn main()
         .unwrap()
         .block_on(async 
         {
-            let client = AuthClient::new("user5", "password44");
+            let client = AuthClient::new("user", "password");
     
             let (clie_send, mut serv_recv) = tokio::sync::mpsc::unbounded_channel::<String>();
             let (serv_send, mut clie_recv) = tokio::sync::mpsc::unbounded_channel::<String>();
 
+            let authdb = AuthDB::new();
+            let authdbcb = AuthDBCb{};
+            let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
+        
+            let server = 
+                AsyncScramServer
+                    ::<ScramSha256RustNative, AuthDB, AuthDBCb>
+                    ::new_variable(BorrowOrConsume::from(authdb), BorrowOrConsume::from(authdbcb), ScramNonce::none(), BorrowOrConsume::from(scramtype.clone())).unwrap();
+
             let hndl = 
                 tokio::spawn(async move 
                     {
-                        let authdb = AuthDB::new();
-                        let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
-                    
-                        let mut server = 
-                            AsyncScramServer::<ScramSha256RustNative, AuthDB, AuthDB>::new(&authdb, &authdb, ScramNonce::none(), scramtype).unwrap();
+                        
+
+                        let mut dyn_server = server.make_dyn();
                     
                         loop
                         {
                             let client_data = serv_recv.recv().await.unwrap();
 
-                            let serv_data = server.parse_response_base64(client_data).await;
+                            let serv_data = dyn_server.parse_response_base64(client_data.as_bytes()).await;
                             serv_send.send(serv_data.encode_base64()).unwrap();
 
                             match serv_data

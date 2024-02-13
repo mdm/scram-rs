@@ -8,7 +8,7 @@
  */
 
 
-use std::mem;
+use std::{mem, fmt};
 
 use base64::Engine;
 use base64::engine::general_purpose;
@@ -20,6 +20,47 @@ use super::scram_common::ScramCommon;
 
 pub use super::scram_sync;
 pub use super::scram_async;
+
+/// A wrapper which allows to create instance which either borrows with the 
+/// lifetime or consumes instance.
+#[derive(Debug)]
+pub enum BorrowOrConsume<'br, A: fmt::Debug>
+{
+    /// A consumed instance.
+    Consumed(A),
+
+    /// A borrowed instance.
+    Borrowed(&'br A)
+}
+
+impl<'br, A: fmt::Debug> From<A> for BorrowOrConsume<'_, A>
+{
+    fn from(value: A) -> Self 
+    {
+        return Self::Consumed(value);
+    }
+}
+
+impl<'br, A: fmt::Debug> From<&'br A> for BorrowOrConsume<'br, A>
+{
+    fn from(value: &'br A) -> Self 
+    {
+        return Self::Borrowed(value)
+    }
+}
+
+impl<'br, A: fmt::Debug> AsRef<A> for BorrowOrConsume<'br, A>
+{
+    fn as_ref(&self) -> &A 
+    {
+        match *self
+        {
+            Self::Borrowed(b) => return b,
+            Self::Consumed(ref b) => return b,
+        }
+    }
+}
+
 
 /// A state encoder for Scram Client.
 /// There is an internal state machine which automatically changes the
@@ -280,4 +321,34 @@ impl<'sn> ScramNonce<'sn>
     }
 }
 
+#[cfg(test)]
+mod test
+{
+    use crate::BorrowOrConsume;
 
+    #[test]
+    fn test0()
+    {
+        #[derive(Debug)]
+        struct Test1 {}
+        
+        let newtest = Test1{};
+
+        let borrow = BorrowOrConsume::<'_, Test1>::from(&newtest);
+
+        match borrow
+        {
+            BorrowOrConsume::Borrowed(_) => println!("borrowed newtest"),
+            _ => panic!("not borrowed newtest")
+        }
+
+        let newtest2 = Test1{};
+        let consumed = BorrowOrConsume::<'_, Test1>::from(newtest2);
+
+        match consumed
+        {
+            BorrowOrConsume::Consumed(_) => println!("consumed newtest2"),
+            _ => panic!("not consumed newtest2")
+        }
+    }
+}

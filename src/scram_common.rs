@@ -30,7 +30,7 @@ pub enum ScramTypeAlias
 }
 
 /// A structured data about supported mechanisms
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct ScramType
 {
     /// Scram type encoded as in RFC without trailing \r\n or \n
@@ -247,10 +247,16 @@ impl ScramCommon
     }
 }
 
-#[test]
-fn sanitize_unicode()
+#[cfg(test)]
+mod tests
 {
-    let res = ScramCommon::sanitize_str_unicode("る\n\0bp234");
+    use crate::ScramCommon;
 
-    assert_eq!(res.as_str(), "る\\x0a\\x00bp234");
+    #[test]
+    fn sanitize_unicode()
+    {
+        let res = ScramCommon::sanitize_str_unicode("る\n\0bp234");
+
+        assert_eq!(res.as_str(), "る\\x0a\\x00bp234");
+    }
 }

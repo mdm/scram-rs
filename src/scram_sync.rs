@@ -36,6 +36,7 @@ mod tests
     #[test]
     fn scram_sha256_works() 
     { 
+        #[derive(Debug)]
         struct AuthClient
         {
             username: String,
@@ -136,6 +137,7 @@ mod tests
     #[test]
     fn scram_sha256_server() 
     { 
+        #[derive(Debug)]
         struct AuthServer
         {
 

@@ -7,6 +7,8 @@
  *  file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
+use core::fmt;
+
 use async_trait::async_trait;
 
 use crate::{ScramResult, ScramErrorCode};
@@ -23,7 +25,7 @@ use crate::scram_ierror;
 /// By defualt each function returns error: [ScramErrorCode::ChanBindNotImplemented]
 /// 
 /// Functions must return a raw data retreived form your TLS library.
-pub trait ScramCbHelper
+pub trait ScramCbHelper: fmt::Debug
 {
     /// This function returns (on success) a TLS endpoint cert data.
     /// For example from function: native_tls::TlsStream::tls_server_end_point()
@@ -66,7 +68,7 @@ pub trait ScramCbHelper
 /// 
 /// By defualt each function returns error: ScramErrorCode::ChanBindNotImplemented
 #[async_trait]
-pub trait AsyncScramCbHelper: Sync
+pub trait AsyncScramCbHelper: Sync + fmt::Debug
 {
     /// This function returns (on success) a TLS endpoint cert data.
     /// For example from function: native_tls::TlsStream::tls_server_end_point()

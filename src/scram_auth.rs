@@ -7,6 +7,7 @@
  *  file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
+use core::fmt;
 use std::num::NonZeroU32;
 
 use async_trait::async_trait;
@@ -15,7 +16,7 @@ use base64::engine::general_purpose;
 
 use crate::{scram_error_map, ScramErrorCode, ScramServerError};
 
-use super::scram_error::{ScramResult};
+use super::scram_error::ScramResult;
 
 use super::scram_common::ScramCommon;
 use super::scram_hashing::ScramHashing;
@@ -452,7 +453,7 @@ impl ScramPassword
 ///     }
 /// }
 /// ```
-pub trait ScramAuthServer<S: ScramHashing>
+pub trait ScramAuthServer<S: ScramHashing>: fmt::Debug
 {
     fn get_password_for_user(&self, username: &str) -> ScramResult<ScramPassword>;
 }
@@ -495,7 +496,7 @@ pub trait ScramAuthServer<S: ScramHashing>
 /// }
 /// ```
 #[async_trait]
-pub trait AsyncScramAuthServer<S: ScramHashing>
+pub trait AsyncScramAuthServer<S: ScramHashing>: fmt::Debug
 {
     async fn get_password_for_user(&self, username: &str) -> ScramResult<ScramPassword>;
 }
@@ -520,7 +521,7 @@ pub trait AsyncScramAuthServer<S: ScramHashing>
 ///     }
 /// }
 /// ```
-pub trait ScramAuthClient
+pub trait ScramAuthClient: fmt::Debug
 {
     /// This function must return plain text username
     fn get_username(&self) -> &str;
@@ -554,7 +555,7 @@ pub trait ScramAuthClient
 /// }
 /// ```
 #[async_trait]
-pub trait AsyncScramAuthClient
+pub trait AsyncScramAuthClient: fmt::Debug
 {
     /// This function must return plain text username
     async fn get_username(&self) -> &str;
@@ -564,65 +565,68 @@ pub trait AsyncScramAuthClient
     async fn get_scram_keys(&self) -> &ScramKey;
 }
 
-#[test]
-fn test_exec_time()
+#[cfg(test)]
+mod tests
 {
     use std::time::Instant;
-    use super::scram_hashing::ScramSha256RustNative;
+    use crate::ScramSha256RustNative;
 
-    let start = Instant::now();
+    use super::*;
 
-    let res = ScramPassword::not_found::<ScramSha256RustNative>();
-    assert_eq!(res.is_ok(), true);
+    #[test]
+    fn test_exec_time()
+    {
+        let start = Instant::now();
 
-    let el = start.elapsed();
-    println!("not found took: {:?}", el);
+        let res = ScramPassword::not_found::<ScramSha256RustNative>();
+        assert_eq!(res.is_ok(), true);
 
-    let start = Instant::now();
+        let el = start.elapsed();
+        println!("not found took: {:?}", el);
 
-    let res = ScramPassword::found_plaintext_password::<ScramSha256RustNative>(b"123", None);
-    assert_eq!(res.is_ok(), true);
-    
-    let el = start.elapsed();
-    println!("found_plaintext_password: {:?}", el);
+        let start = Instant::now();
 
-}
+        let res = ScramPassword::found_plaintext_password::<ScramSha256RustNative>(b"123", None);
+        assert_eq!(res.is_ok(), true);
+        
+        let el = start.elapsed();
+        println!("found_plaintext_password: {:?}", el);
 
-#[test]
-fn test_password_gen()
-{
-    use std::time::Instant;
-    use super::scram_hashing::ScramSha256RustNative;
+    }
 
-    let start = Instant::now();
+    #[test]
+    fn test_password_gen()
+    {
+        let start = Instant::now();
 
-    let res = 
-        ScramPassword::salt_password_with_params::<_, ScramSha256RustNative>(
-            "pencil".to_string().into_bytes(), 
-            Some("test".to_string().into_bytes()), 
-            Some(NonZeroU32::new(4096).unwrap()),
-            None,
-        );
+        let res = 
+            ScramPassword::salt_password_with_params::<_, ScramSha256RustNative>(
+                "pencil".to_string().into_bytes(), 
+                Some("test".to_string().into_bytes()), 
+                Some(NonZeroU32::new(4096).unwrap()),
+                None,
+            );
 
-    let el = start.elapsed();
-    println!("test_password_gen: {:?}", el);
+        let el = start.elapsed();
+        println!("test_password_gen: {:?}", el);
 
-    assert_eq!(res.is_ok(), true, "{}", res.err().unwrap());
+        assert_eq!(res.is_ok(), true, "{}", res.err().unwrap());
 
-    let res = res.unwrap();
+        let res = res.unwrap();
 
-    assert_eq!(res.get_iterations().get(), 4096);
-    assert_eq!(res.get_salt_base64().as_str(), "dGVzdA==");
-    assert_eq!(res.get_salted_hashed_password(), 
-        general_purpose::STANDARD.decode("afBEmfdaTuiwYy1yoCIQ8XJJ1Awzo3Ha5Mf2aLTRHhs=").unwrap());
+        assert_eq!(res.get_iterations().get(), 4096);
+        assert_eq!(res.get_salt_base64().as_str(), "dGVzdA==");
+        assert_eq!(res.get_salted_hashed_password(), 
+            general_purpose::STANDARD.decode("afBEmfdaTuiwYy1yoCIQ8XJJ1Awzo3Ha5Mf2aLTRHhs=").unwrap());
 
-    return;
-}
+        return;
+    }
 
-#[test]
-fn test_if()
-{
-    let res = ScramPassword::default();
+    #[test]
+    fn test_if()
+    {
+        let res = ScramPassword::default();
 
-    assert_eq!(res.is_ok(), false);
+        assert_eq!(res.is_ok(), false);
+    }
 }

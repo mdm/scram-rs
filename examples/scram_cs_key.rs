@@ -14,6 +14,7 @@ use scram_rs::scram_sync::SyncScramClient;
 use scram_rs::scram_sync::{SyncScramServer, ScramServerDyn};
 use scram_rs::ScramCommon;
 
+#[derive(Debug)]
 struct AuthDB
 {
 }
@@ -56,6 +57,7 @@ impl ScramAuthServer<ScramSha256RustNative> for AuthDB
     }
 }
 
+#[derive(Debug)]
 struct AuthClient
 {
     username: String,
