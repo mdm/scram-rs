@@ -9,6 +9,7 @@
 
 use std::fmt;
 
+#[derive(Clone, Eq, PartialEq)]
 pub struct ScramRuntimeError 
 {
     /// Error code for internal usage
@@ -198,6 +199,7 @@ impl From<&str> for ScramServerError
 }
 
 /// Error code
+#[derive(Clone, Eq, PartialEq)]
 pub enum ScramErrorCode
 {
     /// Error happened inside lib

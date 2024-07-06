@@ -4,7 +4,6 @@ use std::num::NonZeroU32;
 use scram_rs::AsyncScramAuthClient;
 use scram_rs::AsyncScramAuthServer;
 use scram_rs::AsyncScramCbHelper;
-use scram_rs::BorrowOrConsume;
 use scram_rs::ScramResult;
 use scram_rs::ScramResultClient;
 use scram_rs::ScramSha256RustNative;
@@ -13,7 +12,7 @@ use scram_rs::ScramPassword;
 use scram_rs::async_trait;
 use scram_rs::scram_async::AsyncScramClient;
 use scram_rs::scram_async::AsyncScramServer;
-use scram_rs::ScramCommon;
+use scram_rs::SCRAM_TYPES;
 
 #[derive(Debug)]
 struct AuthDB
@@ -89,7 +88,7 @@ struct AuthClient
 }
 
 #[async_trait]
-impl AsyncScramCbHelper for AuthClient
+impl AsyncScramCbHelper for &AuthClient
 {
     async 
     fn get_tls_server_endpoint(&self) -> ScramResult<Vec<u8>> 
@@ -110,7 +109,7 @@ impl AsyncScramCbHelper for AuthClient
 }
 
 #[async_trait]
-impl AsyncScramAuthClient for AuthClient
+impl AsyncScramAuthClient for &AuthClient
 {
     async fn get_username(&self) -> &str
     {
@@ -156,12 +155,12 @@ pub fn main()
 
             let authdb = AuthDB::new();
             let authdbcb = AuthDBCb{};
-            let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
+            let scramtype = SCRAM_TYPES.get_scramtype("SCRAM-SHA-256").unwrap();
         
             let server = 
                 AsyncScramServer
                     ::<ScramSha256RustNative, AuthDB, AuthDBCb>
-                    ::new_variable(BorrowOrConsume::from(authdb), BorrowOrConsume::from(authdbcb), ScramNonce::none(), BorrowOrConsume::from(scramtype.clone())).unwrap();
+                    ::new(authdb, authdbcb, ScramNonce::none(), scramtype).unwrap();
 
             let hndl = 
                 tokio::spawn(async move 
@@ -196,7 +195,10 @@ pub fn main()
                 );
 
             let mut client =
-                AsyncScramClient::<ScramSha256RustNative, AuthClient, AuthClient>::new(&client, ScramNonce::None, scram_rs::ChannelBindType::None, &client).unwrap();
+                AsyncScramClient
+                    ::<ScramSha256RustNative, &AuthClient, &AuthClient>
+                    ::new(&client, ScramNonce::None, scram_rs::ChannelBindType::None, &client)
+                        .unwrap();
 
             // client sends initial message: cli -> serv
             let ci = client.init_client().await.encode_output_base64().unwrap();

@@ -19,11 +19,13 @@
 //! Features:
 //! - `use_ring` - adds crate: [ring] as an alternative hashing and other crypto functions.
 //!
+//! - `exclude_sha1` - if enabled excludes the SHA1.
+//! 
 //! For default crypto crates:
-//! scram-rs = { version = "0.4", default-features = true}
+//! scram-rs = { version = "0.12", default-features = true}
 //! 
 //! For `ring` crypto crates:
-//! scram-rs = { version = "0.4", default-features = false, features = ["use_ring"]}
+//! scram-rs = { version = "0.12", default-features = false, features = ["use_ring"]}
 //! 
 //! ### scram_sha256_server() sync/async tests (DEBUG)
 //! 
@@ -97,6 +99,7 @@ pub use scram_hashing::*;
 pub use scram_error::*;
 pub use scram_cbh::*;
 pub use scram_dyn::*;
+pub use scram_common::ScramTypes;
 
 pub use async_trait::async_trait;
 

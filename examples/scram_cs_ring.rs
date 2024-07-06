@@ -16,6 +16,7 @@ pub mod RingUsed
     use scram_rs::scram_sync::{ScramServerDyn, SyncScramServer};
     use scram_rs::ScramCommon;
 
+    #[derive(Debug)]
     struct AuthDB
     {
     }
@@ -28,12 +29,12 @@ pub mod RingUsed
         }
     }
 
-    impl ScramCbHelper for AuthDB
+    impl ScramCbHelper for &AuthDB
     {
         
     }
 
-    impl ScramAuthServer<ScramSha256Ring> for AuthDB
+    impl ScramAuthServer<ScramSha256Ring> for &AuthDB
     {
         fn get_password_for_user(&self, username: &str) -> ScramResult<ScramPassword>
         {
@@ -54,6 +55,7 @@ pub mod RingUsed
         }
     }
 
+    #[derive(Debug)]
     struct AuthClient
     {
         username: String,
@@ -61,7 +63,7 @@ pub mod RingUsed
         key: scram_rs::ScramKey,
     }
 
-    impl ScramAuthClient for AuthClient
+    impl ScramAuthClient for &AuthClient
     {
         fn get_username(&self) -> &str
         {
@@ -79,7 +81,7 @@ pub mod RingUsed
         }
     }
 
-    impl ScramCbHelper for AuthClient
+    impl ScramCbHelper for &AuthClient
     {
         
     }
@@ -98,6 +100,8 @@ pub mod RingUsed
     #[cfg(feature = "use_ring")]
     pub fn main1()
     {
+        use scram_rs::SCRAM_TYPES;
+
         let client = AuthClient::new("user", "password");
         
         let (clie_send, serv_recv) = std::sync::mpsc::channel::<String>();
@@ -107,10 +111,10 @@ pub mod RingUsed
             std::thread::spawn(move || 
                 {
                     let authdb = AuthDB::new();
-                    let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
+                    let scramtype = SCRAM_TYPES.get_scramtype("SCRAM-SHA-256").unwrap();
                 
                     let mut server = 
-                        SyncScramServer::<ScramSha256Ring, AuthDB, AuthDB>::new(&authdb, &authdb, ScramNonce::none(), scramtype).unwrap();
+                        SyncScramServer::<ScramSha256Ring, &AuthDB, &AuthDB>::new(&authdb, &authdb, ScramNonce::none(), scramtype).unwrap();
                 
                     loop
                     {
@@ -138,7 +142,7 @@ pub mod RingUsed
             );
 
         let mut client =
-            SyncScramClient::<ScramSha256Ring, AuthClient, AuthClient>::new(&client, ScramNonce::None, scram_rs::ChannelBindType::None, &client).unwrap();
+            SyncScramClient::<ScramSha256Ring, &AuthClient, &AuthClient>::new(&client, ScramNonce::None, scram_rs::ChannelBindType::None, &client).unwrap();
 
         // client sends initial message: cli -> serv
         let ci = client.init_client().encode_output_base64().unwrap();

@@ -12,6 +12,7 @@ use scram_rs::ScramAuthServer;
 use scram_rs::scram_sync::SyncScramClient;
 use scram_rs::scram_sync::{ScramServerDyn, SyncScramServer};
 use scram_rs::ScramCommon;
+use scram_rs::SCRAM_TYPES;
 
 #[derive(Debug)]
 struct AuthDB
@@ -26,12 +27,12 @@ impl AuthDB
     }
 }
 
-impl ScramCbHelper for AuthDB
+impl ScramCbHelper for &AuthDB
 {
     
 }
 
-impl ScramAuthServer<ScramSha256RustNative> for AuthDB
+impl ScramAuthServer<ScramSha256RustNative> for &AuthDB
 {
     fn get_password_for_user(&self, username: &str) -> ScramResult<ScramPassword>
     {
@@ -60,7 +61,7 @@ struct AuthClient
     key: scram_rs::ScramKey,
 }
 
-impl ScramAuthClient for AuthClient
+impl ScramAuthClient for &AuthClient
 {
     fn get_username(&self) -> &str
     {
@@ -78,7 +79,7 @@ impl ScramAuthClient for AuthClient
     }
 }
 
-impl ScramCbHelper for AuthClient
+impl ScramCbHelper for &AuthClient
 {
     
 }
@@ -104,10 +105,10 @@ pub fn main()
         std::thread::spawn(move || 
             {
                 let authdb = AuthDB::new();
-                let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
+                let scramtype = SCRAM_TYPES.get_scramtype("SCRAM-SHA-256").unwrap();
             
                 let mut server = 
-                    SyncScramServer::<ScramSha256RustNative, AuthDB, AuthDB>::new(&authdb, &authdb, ScramNonce::none(), scramtype).unwrap();
+                    SyncScramServer::<ScramSha256RustNative, &AuthDB, &AuthDB>::new(&authdb, &authdb, ScramNonce::none(), scramtype).unwrap();
             
                 loop
                 {
@@ -135,7 +136,10 @@ pub fn main()
         );
 
     let mut client =
-        SyncScramClient::<ScramSha256RustNative, AuthClient, AuthClient>::new(&client, ScramNonce::None, scram_rs::ChannelBindType::None, &client).unwrap();
+        SyncScramClient
+            ::<ScramSha256RustNative, &AuthClient, &AuthClient>
+            ::new(&client, ScramNonce::None, scram_rs::ChannelBindType::None, &client)
+                .unwrap();
 
     // client sends initial message: cli -> serv
     let ci = client.init_client().encode_output_base64().unwrap();

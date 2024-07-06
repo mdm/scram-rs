@@ -1,7 +1,6 @@
 
 use std::num::NonZeroU32;
 
-use scram_rs::BorrowOrConsume;
 use scram_rs::ScramAuthClient;
 use scram_rs::ScramCbHelper;
 use scram_rs::ScramResult;
@@ -13,6 +12,7 @@ use scram_rs::ScramAuthServer;
 use scram_rs::scram_sync::SyncScramClient;
 use scram_rs::scram_sync::{ScramServerDyn, SyncScramServer};
 use scram_rs::ScramCommon;
+use scram_rs::SCRAM_TYPES;
 
 #[derive(Debug)]
 struct AuthDB
@@ -43,7 +43,7 @@ impl ScramCbHelper for ConnectionInst
     
 }
 
-impl ScramAuthServer<ScramSha256RustNative> for AuthDB
+impl ScramAuthServer<ScramSha256RustNative> for &AuthDB
 {
     fn get_password_for_user(&self, username: &str) -> ScramResult<ScramPassword>
     {
@@ -129,16 +129,16 @@ pub fn main()
             {
                 let authdb = AuthDB::new();
                 let conninst = ConnectionInst::new();
-                let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
+                let scramtype = SCRAM_TYPES.get_scramtype("SCRAM-SHA-256").unwrap();
             
                 let mut server = 
                     SyncScramServer
-                        ::<ScramSha256RustNative, AuthDB, ConnectionInst>
-                        ::new_variable(
-                            BorrowOrConsume::from(authdb), 
-                            BorrowOrConsume::from(conninst), 
+                        ::<ScramSha256RustNative, &AuthDB, ConnectionInst>
+                        ::new(
+                            &authdb, 
+                            conninst, 
                             ScramNonce::none(), 
-                            BorrowOrConsume::from(scramtype)
+                            scramtype
                         )
                         .unwrap();
             
@@ -170,7 +170,8 @@ pub fn main()
     let mut client =
         SyncScramClient
             ::<ScramSha256RustNative, AuthClient, AuthClientCb>
-            ::new_variable(BorrowOrConsume::from(client), ScramNonce::None, scram_rs::ChannelBindType::None, BorrowOrConsume::from(clientcb)).unwrap();
+            ::new(client, ScramNonce::None, scram_rs::ChannelBindType::None, clientcb)
+                .unwrap();
 
     // client sends initial message: cli -> serv
     let ci = client.init_client().encode_output_base64().unwrap();

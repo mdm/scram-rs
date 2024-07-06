@@ -12,7 +12,6 @@ use std::marker::PhantomData;
 
 use base64::Engine;
 use base64::engine::general_purpose;
-use crate::BorrowOrConsume;
 
 pub use super::scram_dyn::ScramServerDyn;
 use super::scram_cbh::ScramCbHelper;
@@ -22,7 +21,7 @@ use super::{scram_error, scram_error_map};
 use super::scram_cb::ChannelBindType;
 use super::scram_auth::{ScramPassword, ScramAuthServer};
 use super::scram_hashing::ScramHashing;
-use super::scram_common::{ScramType, ScramCommon};
+use super::scram_common::ScramType;
 use super::scram_state::ScramState;
 use super::scram_parser::*;
 use super::scram::ScramNonce;
@@ -41,30 +40,38 @@ use super::scram::ScramNonce;
 ///     also provide the data_chanbind argument with the server
 ///     certificate endpoint i.e native_tls::TlsStream::tls_server_end_point()  
 #[derive(Debug)]
-pub struct SyncScramServer<'ss, S: ScramHashing, A: ScramAuthServer<S>, B: ScramCbHelper>
+pub struct SyncScramServer<S: ScramHashing, A: ScramAuthServer<S>, B: ScramCbHelper>
 {
     /// The hasher which will be used: SHA-1 SHA-256
     hasher: PhantomData<S>,
+
     /// The Auth backend which handles user search
-    auth: BorrowOrConsume<'ss, A>,
+    auth: A,
+
     /// The current instance type
-    st: BorrowOrConsume<'ss, ScramType>,
+    st: &'static ScramType,
+
     /// username n=
     username: Option<String>,
+
     /// Returned password with status found/notfound
     sp: ScramPassword,
+
     /// Generated server nonce
     server_nonce: String,
+
     /// Current scrum state
     state: ScramState,
+
     /// Received channel binding opt from client
     cli_chanbind: ChannelBindType,
+
     /// A callback to support channel bind mechanism
-    chanbind_helper: BorrowOrConsume<'ss, B>,
+    chanbind_helper: B,
 }
 
-impl<'ss, S: ScramHashing + 'ss, A: ScramAuthServer<S>, B: ScramCbHelper> ScramServerDyn 
-for SyncScramServer<'ss, S, A, B>
+impl<S: ScramHashing, A: ScramAuthServer<S>, B: ScramCbHelper> ScramServerDyn 
+for SyncScramServer<S, A, B>
 {
 
     /// Exposing the username privided by the client. Can be used to form a
@@ -156,70 +163,22 @@ for SyncScramServer<'ss, S, A, B>
     }
 }
 
-impl<'ss, S: ScramHashing + 'ss, A: ScramAuthServer<S>, B: ScramCbHelper> SyncScramServer<'ss, S, A, B>
+impl<'ss, S: ScramHashing + 'ss, A: ScramAuthServer<S> +'ss, B: ScramCbHelper + 'ss> SyncScramServer<S, A, B>
 {
-    /// Returns the supported types in format SCRAM SCRAM SCRAM
+    /// Consumes the instance converting it into the [ScramServerDyn]. So this instance
+    /// can be stored in the vector.
+    /// 
+    /// But, in this case it is required to initialize the instance with the consumed 
+    /// instances, otherwise it will be limited by 'ss lifetime.
     pub 
-    fn advertise_types<T>(sep: T) -> String
-    where
-        T: AsRef<str>,
+    fn make_dyn(self) -> Box<dyn ScramServerDyn + 'ss>//ScramServerDynHolder<'ss>
     {
-        return ScramCommon::adrvertise(sep);
+        return Box::new(self);//ScramServerDynHolder::new(Box::new(self));
     }
+}
 
-
-    /// Creates new instance of the SyncScramServer. The `scram_auth_serv` and `chan_bind_helper`
-    /// are wrapped into the [BorrowOrConsume] which allows to either borrow or consume the instance.
-    /// 
-    /// # Arguments
-    /// 
-    /// * `scram_auth_serv` - A [BorrowOrConsume] to the instance which implements
-    /// [ScramAuthServer]
-    /// 
-    /// * `data_chanbind` - A channel binding data TLS Endpoint Cert Hash
-    /// 
-    /// * `chan_bind_helper` - An implemented trait [ScramCbHelper] which should provide 
-    ///                 crate with all necessary data for channel bind. In the [BorrowOrConsume]
-    ///                 containter.
-    /// 
-    /// * `scram_nonce` - A Scram Nonce type
-    /// 
-    /// * `st` - A type of the scram picked by name from table [super::scram_common::SCRAM_TYPES]
-    /// 
-    /// # Examples
-    /// ```ignore
-    /// let serv = AuthServer::new();
-    /// let nonce = ScramNonce::Base64(server_nonce);
-    ///
-    /// let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
-    /// let scram_res = ScramServer::<ScramSha256, AuthServer, AuthServer>::new(&serv, &serv, nonce, scramtype);
-    /// ```
-    pub 
-    fn new_variable(
-        scram_auth_serv: BorrowOrConsume<'ss, A>,
-        chan_bind_helper: BorrowOrConsume<'ss, B>,
-        scram_nonce: ScramNonce, 
-        st: BorrowOrConsume<'ss, ScramType>,
-    ) -> ScramResult<SyncScramServer<'ss, S, A, B>>
-    {
-
-        let res = 
-            Self
-            {
-                hasher: PhantomData,
-                auth: scram_auth_serv,
-                st: st,
-                username: None,
-                sp: ScramPassword::default(),
-                server_nonce: scram_nonce.get_nonce()?,
-                state: ScramState::WaitForClientInitalMsg,
-                cli_chanbind: ChannelBindType::n(),
-                chanbind_helper: chan_bind_helper,
-            };
-
-        return Ok(res);
-    }
-
+impl<S: ScramHashing, A: ScramAuthServer<S>, B: ScramCbHelper> SyncScramServer<S, A, B>
+{
     /// Creates new instance of the SyncScramServer by borrowing the 
     /// `scram_auth_serv` and `chan_bind_helper` with lifetime 'ss.
     /// 
@@ -247,39 +206,28 @@ impl<'ss, S: ScramHashing + 'ss, A: ScramAuthServer<S>, B: ScramCbHelper> SyncSc
     /// ```
     pub 
     fn new(
-        scram_auth_serv: &'ss A,
-        chan_bind_helper: &'ss B,
+        scram_auth_serv: A,
+        chan_bind_helper: B,
         scram_nonce: ScramNonce, 
-        st: &'ss ScramType
-    ) -> ScramResult<SyncScramServer<'ss, S, A, B>>
+        st: &'static ScramType
+    ) -> ScramResult<SyncScramServer<S, A, B>>
     {
 
         let res = 
             Self
             {
                 hasher: PhantomData,
-                auth: BorrowOrConsume::from(scram_auth_serv),
-                st: BorrowOrConsume::from(st),
+                auth: scram_auth_serv,
+                st: st,
                 username: None,
                 sp: ScramPassword::default(),
                 server_nonce: scram_nonce.get_nonce()?,
                 state: ScramState::WaitForClientInitalMsg,
                 cli_chanbind: ChannelBindType::n(),
-                chanbind_helper: BorrowOrConsume::from(chan_bind_helper),
+                chanbind_helper: chan_bind_helper,
             };
 
         return Ok(res);
-    }
-
-    /// Consumes the instance converting it into the [ScramServerDyn]. So this instance
-    /// can be stored in the vector.
-    /// 
-    /// But, in this case it is required to initialize the instance with the consumed 
-    /// instances, otherwise it will be limited by 'ss lifetime.
-    pub 
-    fn make_dyn(self) -> Box<dyn ScramServerDyn + 'ss>//ScramServerDynHolder<'ss>
-    {
-        return Box::new(self);//ScramServerDynHolder::new(Box::new(self));
     }
  
     fn parse_response_internal(&mut self, resp: &str) -> ScramResult<String>
@@ -292,13 +240,13 @@ impl<'ss, S: ScramHashing + 'ss, A: ScramAuthServer<S>, B: ScramCbHelper> SyncSc
             ScramData::CmsgInitial{chan_bind, user, nonce} =>
             {
                 //channel bind test
-                chan_bind.server_initial_verify_client_cb(self.st.as_ref())?;
+                chan_bind.server_initial_verify_client_cb(&self.st)?;
 
                 //authID is not supported
 
                 //get user
                 let sp = 
-                    self.auth.as_ref().get_password_for_user(user)?;
+                    self.auth.get_password_for_user(user)?;
 
                 /*if sp.is_ok() == false
                 {
@@ -332,9 +280,9 @@ impl<'ss, S: ScramHashing + 'ss, A: ScramAuthServer<S>, B: ScramCbHelper> SyncSc
                 // verify channel bind
                 self.cli_chanbind
                     .server_final_verify_client_cb(
-                        self.st.as_ref(), 
+                        &self.st, 
                         chanbinding,
-                        self.chanbind_helper.as_ref()
+                        &self.chanbind_helper
                     )?;
 
                 let nonce = 

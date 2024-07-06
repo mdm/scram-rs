@@ -1,7 +1,6 @@
 
 use std::num::NonZeroU32;
 
-use scram_rs::BorrowOrConsume;
 use scram_rs::ScramAuthClient;
 use scram_rs::ScramCbHelper;
 use scram_rs::ScramResult;
@@ -13,6 +12,7 @@ use scram_rs::ScramAuthServer;
 use scram_rs::scram_sync::SyncScramClient;
 use scram_rs::scram_sync::SyncScramServer;
 use scram_rs::ScramCommon;
+use scram_rs::SCRAM_TYPES;
 
 #[derive(Debug)]
 struct AuthDB
@@ -66,7 +66,7 @@ struct AuthClient
     key: scram_rs::ScramKey,
 }
 
-impl ScramAuthClient for AuthClient
+impl ScramAuthClient for &AuthClient
 {
     fn get_username(&self) -> &str
     {
@@ -84,7 +84,7 @@ impl ScramAuthClient for AuthClient
     }
 }
 
-impl ScramCbHelper for AuthClient
+impl ScramCbHelper for &AuthClient
 {
     
 }
@@ -108,12 +108,12 @@ pub fn main()
 
     let authdb = AuthDB::new();
     let authdbcb = AuthDBCb{};
-    let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
+    let scramtype = SCRAM_TYPES.get_scramtype("SCRAM-SHA-256").unwrap();
 
     let server = 
         SyncScramServer
             ::<ScramSha256RustNative, AuthDB, AuthDBCb>
-            ::new_variable(BorrowOrConsume::from(authdb), BorrowOrConsume::from(authdbcb), ScramNonce::none(), BorrowOrConsume::from(scramtype.clone())).unwrap();
+            ::new(authdb, authdbcb, ScramNonce::none(), scramtype).unwrap();
 
     let hndl = 
         std::thread::spawn(move || 
@@ -148,7 +148,10 @@ pub fn main()
         );
 
     let mut client =
-        SyncScramClient::<ScramSha256RustNative, AuthClient, AuthClient>::new(&client, ScramNonce::None, scram_rs::ChannelBindType::None, &client).unwrap();
+        SyncScramClient
+            ::<ScramSha256RustNative, &AuthClient, &AuthClient>
+            ::new(&client, ScramNonce::None, scram_rs::ChannelBindType::None, &client)
+                .unwrap();
 
     // client sends initial message: cli -> serv
     let ci = client.init_client().encode_output_base64().unwrap();

@@ -32,6 +32,8 @@ mod tests
     use crate::scram_auth::ScramKey;
     use crate::scram_parser::ScramDataParser;
     use crate::scram_state::ScramState;
+    use crate::ScramTypes;
+    use crate::SCRAM_TYPES;
 
     #[test]
     fn scram_sha256_works() 
@@ -44,7 +46,7 @@ mod tests
             key: ScramKey,
         }
 
-        impl ScramAuthClient for AuthClient
+        impl ScramAuthClient for &AuthClient
         {
             fn get_username(&self) -> &str
             {
@@ -62,7 +64,7 @@ mod tests
             }
         }
 
-        impl ScramCbHelper for AuthClient
+        impl ScramCbHelper for &AuthClient
         {
             
         }
@@ -94,7 +96,7 @@ mod tests
         let nonce = ScramNonce::Plain(&client_nonce_dec);
 
         let scram_res = 
-            SyncScramClient::<ScramSha256RustNative, AuthClient, AuthClient>::new(&ac, nonce, cbt, &ac);
+            SyncScramClient::<ScramSha256RustNative, &AuthClient, &AuthClient>::new(&ac, nonce, cbt, &ac);
         assert_eq!(scram_res.is_ok(), true);
 
         let mut scram = scram_res.unwrap();
@@ -143,7 +145,7 @@ mod tests
 
         }
 
-        impl ScramAuthServer<ScramSha256RustNative> for AuthServer
+        impl ScramAuthServer<ScramSha256RustNative> for &AuthServer
         {
             fn get_password_for_user(&self, _username: &str) -> ScramResult<ScramPassword>
             {
@@ -163,7 +165,7 @@ mod tests
             }
         }
 
-        impl ScramCbHelper for AuthServer
+        impl ScramCbHelper for &AuthServer
         {
             
         }
@@ -187,28 +189,45 @@ mod tests
         let _server_nonce_dec = b"\x86\xf6\x03\xa5e\x1a\xd9\x16\x93\x08\x07\xee\xc4R%\x8e\x13e\x16M".to_vec();
         let client_final = "c=biws,r=rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0,p=dHzbZapWIk4jUhN+Ute9ytag9zjfMHgsqmmiz7AndVQ=";
         let server_final = "v=6rriTRBi23WpRR/wtup+mMhUZUn/dB5nLTJRsjl95G4=";
-        
-        let _start = Instant::now();
+
+        let start = Instant::now();
 
         let serv = AuthServer::new();
         let nonce = ScramNonce::Base64(server_nonce);
     
-        let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
+        let scramtype = SCRAM_TYPES.get_scramtype("SCRAM-SHA-256").unwrap();
+
+        let l_start = Instant::now();
+
         let scram_res = 
-            SyncScramServer::<ScramSha256RustNative, AuthServer, AuthServer>::new(&serv, &serv, nonce, scramtype);
+            SyncScramServer::<ScramSha256RustNative, &AuthServer, &AuthServer>::new(&serv, &serv, nonce, scramtype);
+
+        let el = l_start.elapsed();
+        println!("0 took: {:?}", el);
+
         assert_eq!(scram_res.is_ok(), true);
 
         let mut scram = scram_res.unwrap();
 
-        let start = Instant::now();
+        
+        let l_start = Instant::now();
         let resp_res = scram.parse_response(client_init);
+
+        let el = l_start.elapsed();
+        println!("1 took: {:?}", el);
 
         assert_eq!(resp_res.is_ok(), true);
 
         let resp = resp_res.get_raw_output();
         assert_eq!( resp, server_init ); 
 
+        let l_start = Instant::now();
+
         let resp_res = scram.parse_response(client_final);
+
+        let el = l_start.elapsed();
+        println!("2 took: {:?}", el);
+
         if resp_res.is_err() == true
         {
             println!("{}", resp_res.err().unwrap());

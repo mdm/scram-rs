@@ -16,7 +16,7 @@ use base64::engine::general_purpose;
 
 use crate::scram_cbh::ScramCbHelper;
 pub use crate::scram_dyn::ScramServerDyn;
-use crate::{scram_ierror, scram_ierror_map, BorrowOrConsume};
+use crate::{scram_ierror, scram_ierror_map};
 
 use super::scram_error::{ScramResult, ScramErrorCode};
 use super::scram_cb::ChannelBindType;
@@ -39,12 +39,12 @@ use super::scram::{ScramNonce, ScramResultClient};
 ///     TLS connection.
 ///     i.e native_tls::TlsStream::tls_server_end_point()  
 #[derive(Debug)]
-pub struct SyncScramClient<'sc, S: ScramHashing, A: ScramAuthClient, B: ScramCbHelper>
+pub struct SyncScramClient<S: ScramHashing, A: ScramAuthClient, B: ScramCbHelper>
 {
     /// A hasher picked
     hasher: PhantomData<S>,
     /// A authentification callback
-    auth: BorrowOrConsume<'sc, A>,
+    auth: A,
     /// A client generated/picked nonce (base64)
     client_nonce: String,
     /// A current state step
@@ -52,61 +52,11 @@ pub struct SyncScramClient<'sc, S: ScramHashing, A: ScramAuthClient, B: ScramCbH
     /// A type of the channel bind [ChannelBindType]
     chanbind: ChannelBindType,
     /// A callback to support channel bind mechanism
-    chanbind_helper: BorrowOrConsume<'sc, B>,
+    chanbind_helper: B,
 }
 
-impl<'sc, S: ScramHashing, A: ScramAuthClient, B: ScramCbHelper> SyncScramClient<'sc, S, A, B>
+impl<S: ScramHashing, A: ScramAuthClient, B: ScramCbHelper> SyncScramClient<S, A, B>
 {
-
-    /// Creates a new client instance with borrowed arguments. Sets all fields to 
-    /// default instance.
-    /// 
-    /// # Arguments
-    /// 
-    /// * `scram_auth_cli` - an authentification instance which implements [ScramAuthClient]
-    ///     in [BorrowOrConsume] or consume wrapper.
-    /// 
-    /// * `scram_nonce` - a client scram nonce [ScramNonce]
-    /// 
-    /// * `chan_bind_type` - picks the channel bound [ChannelBindType]. It is
-    ///                     responsibility of the developer to correctly set the chan binding
-    ///                     type.
-    /// 
-    /// * `chan_bind_helper` - a data type which implements a traint [ScramCbHelper] which
-    ///                 contains functions for realization which are designed to provide the
-    ///                 channel bind data to the `SCRAM` crate. In [BorrowOrConsume] wrapper.
-    /// 
-    /// # Examples
-    /// 
-    /// ```ignore
-    /// let cbt = ChannelBindType::None;
-    ///
-    /// let ac = AuthClient::new(username, password);
-    /// let nonce = ScramNonce::Plain(&client_nonce_dec);
-    ///
-    /// let scram_res = SyncScramClient::<ScramSha256, AuthClient, AuthClient>::new(&ac, nonce, cbt, &ac);
-    /// ```
-    pub 
-    fn new_variable(
-        scram_auth_cli: BorrowOrConsume<'sc, A>, 
-        scram_nonce: ScramNonce, 
-        chan_bind_type: ChannelBindType,
-        chan_bind_helper: BorrowOrConsume<'sc, B>,
-    ) -> ScramResult<SyncScramClient<'sc, S, A, B>>
-    {
-        return Ok(
-            Self
-            {
-                hasher: PhantomData,
-                auth: scram_auth_cli,
-                client_nonce: scram_nonce.get_nonce()?,
-                state: ScramState::InitClient,
-                chanbind: chan_bind_type,
-                chanbind_helper: chan_bind_helper,
-            }
-        );
-    }
-
     /// Creates a new client instance with borrowed arguments. Sets all fields to 
     /// default instance.
     /// 
@@ -132,25 +82,25 @@ impl<'sc, S: ScramHashing, A: ScramAuthClient, B: ScramCbHelper> SyncScramClient
     /// let ac = AuthClient::new(username, password);
     /// let nonce = ScramNonce::Plain(&client_nonce_dec);
     ///
-    /// let scram_res = SyncScramClient::<ScramSha256, AuthClient, AuthClient>::new(&ac, nonce, cbt, &ac);
+    /// let scram_res = SyncScramClient::<ScramSha256, &AuthClient, &AuthClient>::new(&ac, nonce, cbt, &ac);
     /// ```
     pub 
     fn new(
-        scram_auth_cli: &'sc A, 
+        scram_auth_cli: A, 
         scram_nonce: ScramNonce, 
         chan_bind_type: ChannelBindType,
-        chan_bind_helper: &'sc B,
-    ) -> ScramResult<SyncScramClient<'sc, S, A, B>>
+        chan_bind_helper: B,
+    ) -> ScramResult<SyncScramClient<S, A, B>>
     {
         return Ok(
             Self
             {
                 hasher: PhantomData,
-                auth: BorrowOrConsume::from(scram_auth_cli),
+                auth: scram_auth_cli,
                 client_nonce: scram_nonce.get_nonce()?,
                 state: ScramState::InitClient,
                 chanbind: chan_bind_type,
-                chanbind_helper: BorrowOrConsume::from(chan_bind_helper),
+                chanbind_helper: chan_bind_helper,
             }
         );
     }
@@ -181,7 +131,7 @@ impl<'sc, S: ScramHashing, A: ScramAuthClient, B: ScramCbHelper> SyncScramClient
         let compiled = 
             [
                 self.chanbind.convert2header(),
-                "n=", self.auth.as_ref().get_username(),
+                "n=", self.auth.get_username(),
                 ",r=", self.client_nonce.as_str(),
             ].concat();
         
@@ -275,7 +225,7 @@ impl<'sc, S: ScramHashing, A: ScramAuthClient, B: ScramCbHelper> SyncScramClient
                     general_purpose::STANDARD.encode(
                         [
                             self.chanbind.convert2header().as_bytes(), 
-                            self.chanbind.get_cb_data_raw(self.chanbind_helper.as_ref())?.as_slice(),
+                            self.chanbind.get_cb_data_raw(&self.chanbind_helper)?.as_slice(),
                         ]
                         .concat()
                     );
@@ -284,17 +234,17 @@ impl<'sc, S: ScramHashing, A: ScramAuthClient, B: ScramCbHelper> SyncScramClient
 
                 let authmsg = 
                     [
-                        "n=", self.auth.as_ref().get_username(),
+                        "n=", self.auth.get_username(),
                         ",r=", self.client_nonce.as_str(), 
                         ",", resp,
                         ",", client_final_message_bare.as_str()
                     ]
                     .concat();
 
-                let keys = self.auth.as_ref().get_scram_keys();
+                let keys = self.auth.get_scram_keys();
                 
                 let salted_password = 
-                    S::derive(self.auth.as_ref().get_password().as_bytes(), &salt, NonZeroU32::new(itrcnt).unwrap())?;
+                    S::derive(self.auth.get_password().as_bytes(), &salt, NonZeroU32::new(itrcnt).unwrap())?;
                     
                 let client_key = S::hmac(keys.get_clinet_key(), &salted_password)?;
                 let server_key = S::hmac(keys.get_server_key(), &salted_password)?;

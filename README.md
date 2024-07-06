@@ -1,6 +1,6 @@
 # Scram-rs
 
-v 0.11
+v 0.12
 
 A SCRAM-SHA1, SCRAM-SHA256, SCRAM-SHA512, SCRAM-SHA256-PLUS client and server.  
 
@@ -56,9 +56,12 @@ Both features can not be used at the same time.
 
 Author of this crate is not responsible for anything which may happen.
 
+## Issues tracker:
+[Issues tracket is here](https://gitlab.com/4neko/scram-rs)
+
 ## Usage:  
 
-see ./examples/ [there](https://gitlab.com/relkom/scram-rs/-/tree/master/examples)
+see ./examples/ [there](https://repo.4neko.org/4NEKO/scram-rs)
 
 ## Test based benchmarks:
 
@@ -84,43 +87,43 @@ see ./examples/ [there](https://gitlab.com/relkom/scram-rs/-/tree/master/example
 
 ### Init:
 
-Generic struct:
+Generic struct (borrow intances):
 ```rust
   let authdb = AuthDB::new();
-  let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
+  let scramtype = SCRAM_TYPES.get_scramtype("SCRAM-SHA-256").unwrap();
 
   let mut server = 
-      SyncScramServer::<ScramSha256RustNative, AuthDB, AuthDB>::new(&authdb, &authdb, ScramNonce::none(), scramtype).unwrap();
+      SyncScramServer::<ScramSha256RustNative, &AuthDB, &AuthDB>::new(&authdb, &authdb, ScramNonce::none(), scramtype).unwrap();
 ```
 
 Dynamic:
 ```rust
   let authdb = AuthDB::new();
   let authdbcb = AuthDBCb{};
-  let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
+  let scramtype = SCRAM_TYPES.get_scramtype("SCRAM-SHA-256").unwrap();
 
   let server = 
       SyncScramServer
           ::<ScramSha256RustNative, AuthDB, AuthDBCb>
-          ::new_variable(BorrowOrConsume::from(authdb), BorrowOrConsume::from(authdbcb), ScramNonce::none(), BorrowOrConsume::from(scramtype.clone())).unwrap();
+          ::new_variable(authdb, authdbcb, ScramNonce::none(), scramtype).unwrap();
 
   let mut server_dyn = server.make_dyn();
 ```
 
-Custom:
+Custom (consume the instances): 
 ```rust
   let authdb = AuthDB::new();
   let conninst = ConnectionInst::new();
-  let scramtype = ScramCommon::get_scramtype("SCRAM-SHA-256").unwrap();
+  let scramtype = SCRAM_TYPES.get_scramtype("SCRAM-SHA-256").unwrap();
 
   let mut server = 
       SyncScramServer
           ::<ScramSha256RustNative, AuthDB, ConnectionInst>
           ::new_variable(
-              BorrowOrConsume::from(authdb), 
-              BorrowOrConsume::from(conninst), 
+              authdb, 
+              conninst, 
               ScramNonce::none(), 
-              BorrowOrConsume::from(scramtype)
+              scramtype
           )
           .unwrap();
 ```
